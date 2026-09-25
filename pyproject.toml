@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "softwork"
+version = "0.1.0"
+description = "AI-native parametric CAD application"
+readme = "README.md"
+authors = [{ name = "SoftWork Contributors" }]
+license = { text = "Apache-2.0" }
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.24.0",
+]
+
+[project.optional-dependencies]
+desktop = [
+    "PySide6>=6.5.0",
+]
+cad = [
+    "cadquery>=2.4.0",
+]
+ai = [
+    "openai>=1.0.0",
+    "anthropic>=0.18.0",
+    "google-generativeai>=0.4.0",
+]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+    "mypy>=1.0.0",
+]
+
+[project.scripts]
+softwork = "softwork.app.main:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
