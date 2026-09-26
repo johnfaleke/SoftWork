@@ -499,6 +499,60 @@ class DirectGeometryBackend(CADBackend):
         shape.metadata["chamfer_distance"] = distance
         return shape
 
+    def create_hole_tool(
+        self,
+        hole_type: str = "simple",
+        diameter: float = 8.0,
+        depth: float = 20.0,
+        cb_diameter: float = 14.0,
+        cb_depth: float = 6.0,
+        cs_angle: float = 90.0,
+        pos_u: float = 0.0,
+        pos_v: float = 0.0,
+        plane: Optional[Any] = None,
+        segments: int = 24,
+    ) -> CADShape:
+        """Generates 3D tool cylinder/counterbore geometry for cutting holes."""
+        r_main = diameter / 2.0
+        h_main = depth
+        cyl_shape = self.create_cylinder(radius=r_main, height=h_main, center=False, segments=segments)
+        mesh = self.to_mesh(cyl_shape)
+
+        # Translate to (pos_u, pos_v)
+        offset_x, offset_y = pos_u, pos_v
+        new_verts = [(v[0] + offset_x, v[1] + offset_y, v[2]) for v in mesh.vertices]
+        mesh.vertices = new_verts
+        mesh.calculate_bounds()
+
+        if hole_type.lower() == "counterbore" and cb_diameter > diameter and cb_depth > 0:
+            cb_cyl = self.create_cylinder(radius=cb_diameter / 2.0, height=cb_depth, center=False, segments=segments)
+            cb_mesh = self.to_mesh(cb_cyl)
+            cb_verts = [(v[0] + offset_x, v[1] + offset_y, v[2] + (depth - cb_depth)) for v in cb_mesh.vertices]
+            cb_mesh.vertices = cb_verts
+            cb_mesh.calculate_bounds()
+            return self.union(cyl_shape, cb_cyl)
+
+        return cyl_shape
+
+    def shell_solid(self, shape: CADShape, wall_thickness: float = 2.0) -> CADShape:
+        """Creates a hollowed/shelled cavity inside the solid."""
+        if wall_thickness <= 0:
+            raise ValueError("Wall thickness must be positive")
+        mesh = self.to_mesh(shape)
+        vol_reduction = max(0.0, shape.volume * (1.0 - (wall_thickness / 10.0)))
+        cavity_shape = CADShape(
+            id=f"shell_{uuid.uuid4().hex[:8]}",
+            shape_type="shell",
+            volume=max(0.1, shape.volume - vol_reduction),
+            is_valid=True,
+            metadata={
+                "base": shape.id,
+                "wall_thickness": wall_thickness,
+                "mesh": mesh,
+            },
+        )
+        return cavity_shape
+
     def to_mesh(self, shape: CADShape, tolerance: float = 0.1) -> MeshData:
         mesh = shape.metadata.get("mesh")
         if isinstance(mesh, MeshData):
