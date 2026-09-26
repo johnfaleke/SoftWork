@@ -1,13 +1,250 @@
 """
-Feature creation, modification, and deletion commands.
+Feature creation, modification, sketch extrusion, revolution, and pattern commands for SoftWork v0.2.
 """
 from __future__ import annotations
 from typing import Optional, Dict, Any
 
 from softwork.commands.base import Command
 from softwork.core.document import Document
-from softwork.core.feature import Feature, BoxFeature, CylinderFeature, MountingPlateFeature, FilletFeature
+from softwork.core.feature import (
+    Feature,
+    BoxFeature,
+    CylinderFeature,
+    MountingPlateFeature,
+    FilletFeature,
+    ChamferFeature,
+    SketchFeature,
+    ExtrudeFeature,
+    RevolveFeature,
+    PatternFeature,
+)
+from softwork.sketch.sketch import Sketch
+from softwork.sketch.plane import SketchPlane, StandardPlane
 from softwork.core.transaction import AITransaction, TransactionChange
+
+
+class CreateSketchCommand(Command):
+    def __init__(
+        self,
+        name: str = "Sketch001",
+        plane_type: StandardPlane = StandardPlane.XY,
+        provenance: str = "user",
+    ) -> None:
+        self.name = name
+        self.plane_type = plane_type
+        self.provenance = provenance
+
+    def execute(self, document: Document) -> AITransaction:
+        part = document.active_part
+        sketch = Sketch(name=self.name, plane=SketchPlane.from_standard(self.plane_type))
+        feature = SketchFeature(sketch=sketch, name=self.name, provenance=self.provenance)
+
+        tx = AITransaction(
+            title=f"Create Sketch ({self.plane_type.value})",
+            affected_features=[feature.id],
+        )
+
+        def do() -> None:
+            document.add_feature(feature, part)
+
+        def undo() -> None:
+            part.remove_feature(feature.id)
+            document.dependency_graph.remove_node(feature.id)
+            document.recompute()
+
+        do()
+        tx.changes.append(TransactionChange(description=f"Created {feature.name}", undo_action=undo, redo_action=do))
+        tx.is_committed = True
+        document.history.push_transaction(tx)
+        return tx
+
+
+class ExtrudeSketchCommand(Command):
+    def __init__(
+        self,
+        sketch_feature_id: str,
+        distance: float = 25.0,
+        name: str = "Extrude001",
+        provenance: str = "user",
+    ) -> None:
+        self.sketch_feature_id = sketch_feature_id
+        self.distance = distance
+        self.name = name
+        self.provenance = provenance
+
+    def execute(self, document: Document) -> AITransaction:
+        part = document.active_part
+        sk_feat = document.get_feature(self.sketch_feature_id)
+        if not isinstance(sk_feat, SketchFeature):
+            raise ValueError(f"Feature '{self.sketch_feature_id}' is not a SketchFeature")
+
+        feature = ExtrudeFeature(
+            target_sketch_feature=sk_feat,
+            distance=self.distance,
+            name=self.name,
+            provenance=self.provenance,
+        )
+
+        tx = AITransaction(
+            title=f"Extrude {sk_feat.name} ({self.distance}mm)",
+            affected_features=[feature.id, sk_feat.id],
+        )
+
+        def do() -> None:
+            document.add_feature(feature, part)
+
+        def undo() -> None:
+            part.remove_feature(feature.id)
+            document.dependency_graph.remove_node(feature.id)
+            document.recompute()
+
+        do()
+        tx.changes.append(TransactionChange(description=f"Extruded {sk_feat.name} by {self.distance}mm", undo_action=undo, redo_action=do))
+        tx.is_committed = True
+        document.history.push_transaction(tx)
+        return tx
+
+
+class RevolveSketchCommand(Command):
+    def __init__(
+        self,
+        sketch_feature_id: str,
+        angle_deg: float = 360.0,
+        axis: str = "Y",
+        name: str = "Revolve001",
+        provenance: str = "user",
+    ) -> None:
+        self.sketch_feature_id = sketch_feature_id
+        self.angle_deg = angle_deg
+        self.axis = axis
+        self.name = name
+        self.provenance = provenance
+
+    def execute(self, document: Document) -> AITransaction:
+        part = document.active_part
+        sk_feat = document.get_feature(self.sketch_feature_id)
+        if not isinstance(sk_feat, SketchFeature):
+            raise ValueError(f"Feature '{self.sketch_feature_id}' is not a SketchFeature")
+
+        feature = RevolveFeature(
+            target_sketch_feature=sk_feat,
+            angle_deg=self.angle_deg,
+            axis=self.axis,
+            name=self.name,
+            provenance=self.provenance,
+        )
+
+        tx = AITransaction(
+            title=f"Revolve {sk_feat.name} ({self.angle_deg} deg)",
+            affected_features=[feature.id, sk_feat.id],
+        )
+
+        def do() -> None:
+            document.add_feature(feature, part)
+
+        def undo() -> None:
+            part.remove_feature(feature.id)
+            document.dependency_graph.remove_node(feature.id)
+            document.recompute()
+
+        do()
+        tx.changes.append(TransactionChange(description=f"Revolved {sk_feat.name} by {self.angle_deg} deg", undo_action=undo, redo_action=do))
+        tx.is_committed = True
+        document.history.push_transaction(tx)
+        return tx
+
+
+class AddPatternCommand(Command):
+    def __init__(
+        self,
+        target_feature_id: str,
+        count_x: int = 3,
+        count_y: int = 1,
+        spacing_x: float = 20.0,
+        spacing_y: float = 0.0,
+        name: str = "Pattern001",
+        provenance: str = "user",
+    ) -> None:
+        self.target_feature_id = target_feature_id
+        self.count_x = count_x
+        self.count_y = count_y
+        self.spacing_x = spacing_x
+        self.spacing_y = spacing_y
+        self.name = name
+        self.provenance = provenance
+
+    def execute(self, document: Document) -> AITransaction:
+        part = document.active_part
+        feature = PatternFeature(
+            target_feature_id=self.target_feature_id,
+            count_x=self.count_x,
+            count_y=self.count_y,
+            spacing_x=self.spacing_x,
+            spacing_y=self.spacing_y,
+            name=self.name,
+            provenance=self.provenance,
+        )
+
+        tx = AITransaction(
+            title=f"Pattern ({self.count_x}x{self.count_y})",
+            affected_features=[feature.id, self.target_feature_id],
+        )
+
+        def do() -> None:
+            document.add_feature(feature, part)
+
+        def undo() -> None:
+            part.remove_feature(feature.id)
+            document.dependency_graph.remove_node(feature.id)
+            document.recompute()
+
+        do()
+        tx.changes.append(TransactionChange(description=f"Patterned {feature.name}", undo_action=undo, redo_action=do))
+        tx.is_committed = True
+        document.history.push_transaction(tx)
+        return tx
+
+
+class AddChamferCommand(Command):
+    def __init__(
+        self,
+        target_feature_id: str,
+        distance: float = 1.0,
+        name: str = "Chamfer001",
+        provenance: str = "user",
+    ) -> None:
+        self.target_feature_id = target_feature_id
+        self.distance = distance
+        self.name = name
+        self.provenance = provenance
+
+    def execute(self, document: Document) -> AITransaction:
+        part = document.active_part
+        feature = ChamferFeature(
+            target_feature_id=self.target_feature_id,
+            distance=self.distance,
+            name=self.name,
+            provenance=self.provenance,
+        )
+
+        tx = AITransaction(
+            title=f"Add Chamfer ({self.distance}mm)",
+            affected_features=[feature.id, self.target_feature_id],
+        )
+
+        def do() -> None:
+            document.add_feature(feature, part)
+
+        def undo() -> None:
+            part.remove_feature(feature.id)
+            document.dependency_graph.remove_node(feature.id)
+            document.recompute()
+
+        do()
+        tx.changes.append(TransactionChange(description=f"Added chamfer {feature.name}", undo_action=undo, redo_action=do))
+        tx.is_committed = True
+        document.history.push_transaction(tx)
+        return tx
 
 
 class CreateBoxCommand(Command):
