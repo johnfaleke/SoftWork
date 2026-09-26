@@ -132,7 +132,7 @@ class MainWindow(tk.Tk):
         edit_menu.add_command(label="Undo", command=self._action_undo, accelerator="Ctrl+Z")
         edit_menu.add_command(label="Redo", command=self._action_redo, accelerator="Ctrl+Y")
         edit_menu.add_separator()
-        edit_menu.add_command(label="⚙️ Workspace Settings...", command=self._action_open_settings)
+        edit_menu.add_command(label="⚙️ Workspace Settings & Themes...", command=self._action_open_settings)
         menubar.add_cascade(label="Edit", menu=edit_menu)
 
         design_menu = tk.Menu(menubar, tearoff=0, bg=th.bg_panel, fg=th.fg_primary)
@@ -153,7 +153,13 @@ class MainWindow(tk.Tk):
         view_menu.add_separator()
         view_menu.add_command(label="Reset Camera", command=lambda: self.viewport.reset_view())
         view_menu.add_separator()
-        view_menu.add_command(label="Toggle Dark/Light Mode", command=self._action_toggle_theme)
+        
+        # Theme Submenu listing all 8 themes directly
+        theme_menu = tk.Menu(view_menu, tearoff=0, bg=th.bg_panel, fg=th.fg_primary)
+        for tname in self.theme_manager.themes.keys():
+            theme_menu.add_command(label=tname, command=lambda name=tname: self._switch_theme(name))
+        view_menu.add_cascade(label="🎨 Themes", menu=theme_menu)
+        
         menubar.add_cascade(label="View", menu=view_menu)
 
         ai_menu = tk.Menu(menubar, tearoff=0, bg=th.bg_panel, fg=th.fg_primary)
@@ -205,10 +211,7 @@ class MainWindow(tk.Tk):
         btn_plate = ttk.Button(self.toolbar, text="➕ Plate", command=self._action_create_plate)
         btn_plate.pack(side=tk.LEFT, padx=3)
 
-        # Right Side Tools: Theme Quick Toggle, Settings, Undo/Redo
-        self.btn_theme_toggle = ttk.Button(self.toolbar, text="☀️ Light" if th.is_dark else "🌙 Dark", command=self._action_toggle_theme)
-        self.btn_theme_toggle.pack(side=tk.RIGHT, padx=3)
-
+        # Right Side Tools: Settings, Undo/Redo (Clean preferences entry without toggle button)
         btn_settings = ttk.Button(self.toolbar, text="⚙️ Settings", command=self._action_open_settings)
         btn_settings.pack(side=tk.RIGHT, padx=3)
 
@@ -287,6 +290,11 @@ class MainWindow(tk.Tk):
         )
         self.status_bar.pack(side=tk.BOTTOM, fill=tk.X)
 
+    def _switch_theme(self, theme_name: str) -> None:
+        self.theme_manager.set_theme(theme_name)
+        self.settings_manager.settings.theme_name = theme_name
+        self.settings_manager.save_settings()
+
     def _on_theme_changed(self, new_theme: ThemePalette) -> None:
         self.theme = new_theme
         self.configure(bg=new_theme.bg_app)
@@ -301,17 +309,11 @@ class MainWindow(tk.Tk):
         self.ai_lbl.configure(bg=new_theme.bg_card, fg=new_theme.fg_accent)
         self.ai_entry.configure(bg=new_theme.bg_input, fg=new_theme.fg_primary, insertbackground=new_theme.fg_accent)
         self.status_bar.configure(bg=new_theme.bg_app, fg=new_theme.fg_secondary)
-        self.btn_theme_toggle.configure(text="☀️ Light" if new_theme.is_dark else "🌙 Dark")
 
         # Update viewport
         self.viewport.apply_theme(new_theme)
         self._build_menu()
         self._refresh_all()
-
-    def _action_toggle_theme(self) -> None:
-        new_theme_name = self.theme_manager.toggle_dark_light()
-        self.settings_manager.settings.theme_name = new_theme_name
-        self.settings_manager.save_settings()
 
     def _action_open_settings(self) -> None:
         WorkspaceSettingsDialog(
