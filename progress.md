@@ -10,7 +10,13 @@
 - **v0.2 — Parametric Part Modeling** *(✅ Completed)*: 2D sketches, datum planes (XY/XZ/YZ), closed profiles, extrusions, revolutions, patterns, chamfers, face picking, 2D constraint solver, viewport drawing.
 - **v0.3 — AI CAD Copilot & Advanced Features** *(✅ Completed)*: Live cloud LLM providers (Gemini, Claude, OpenAI), visual AI ghost mesh preview & HUD volume delta, ISO Hole Wizard (M3-M16 Counterbore/Countersink), Shell/Hollow feature.
 - **Modern IDE Architecture & UI Customization** *(✅ Completed)*: Vertical Activity Bar, **Draggable & Collapsible Floating AI Copilot HUD**, breadcrumb navigation, theme engine with 8 presets (OLED True Black, Charcoal, Studio Light, Nordic Frost, Cyberpunk Neon, Industrial Titanium, Forest Sage, Solarized Dark), persistent workspace settings (`~/.softwork/workspace_settings.json`).
-- **PySide6 / Qt6 Modern CAD IDE Frontend** *(✅ Completed)*: Hardware-accelerated Qt viewport (`CADQtViewport`), QSS dark stylesheet (`styles.py`), Qt activity bar (`QtActivityBar`), floating copilot widget (`QtFloatingCopilot`), and IDE main window (`CADMainWindow`).
+- **PySide6 / Qt6 Modern CAD IDE Frontend (SolidWorks & PTC Creo Architecture)** *(✅ Completed)*:
+  - **No Emojis Anywhere**: 100% clean industrial engineering aesthetic with zero emojis in ribbons, trees, dialogs, viewport HUD, or status bars.
+  - **CommandManager Ribbon (Top)**: Tabbed toolbars (`Features`, `Sketch`, `Evaluate`, `Parametric Copilot`, `I/O & History`).
+  - **FeatureManager Design Tree (Left)**: Real CAD hierarchy with standard datum planes (`Front Plane`, `Top Plane`, `Right Plane`, `Origin`), parametric features, and under-defined sketch sub-nodes.
+  - **SolidWorks Studio Gradient Viewport**: Smooth vertical gradient (`#2A2D34` to `#181A1F`), metallic diffuse shaded surfaces, crisp silhouette edges (`#181A1F`), high-contrast cyan face selection (`#00A8FF`), centered **Heads-Up View Toolbar** (`[Fit]`, `[Iso]`, `[Top]`, `[Front]`, `[Right]`, `[Sect]`, `[Style]`), and bottom-left 3D coordinate triad with datum origin.
+  - **Parametric Copilot HUD**: Clean engineering command prompt & NLP execution overlay with live provider badges, parameter log, and ghost geometry wireframes.
+  - **Engineering Status Bar**: `Editing Part` | `Cursor: X, Y, Z` | `Units: MMGS` | `Rebuilt: Clean`.
 - **v0.4 — AI-Native Parametric Editing**: Semantic references, design-intent metadata, dependency-aware preservation.
 - **v0.5 — Advanced Part Modeling**: Loft, sweep, draft, advanced pattern topologies.
 - **v0.6 — Assemblies**: Components, mates, interference detection, BOM.
@@ -72,14 +78,14 @@
 | [`ai/context.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/ai/context.py) | Selection & dependency-aware compressed context builder | ✅ Complete |
 | [`ai/agent.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/ai/agent.py) | `CADAgent` (Understand → Plan with Ghost Simulation → Operate → Validate → Explain) | ✅ Complete |
 
-### 6. Modern PySide6 / Qt6 Desktop IDE Architecture (`softwork.qt`)
+### 6. Clean Desktop CAD IDE Architecture (`softwork.qt`) — *SolidWorks & PTC Creo Standard*
 | Module / File | Description | Status |
 | :--- | :--- | :--- |
-| [`qt/styles.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/qt/styles.py) | Modern dark QSS stylesheet with `#00F0FF` cyan accents, rounded corners, and sleek scrollbars | ✅ Complete |
-| [`qt/activity_bar.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/qt/activity_bar.py) | Vertical IDE Activity Bar providing fast navigation across Model Tree, Tools, and Settings | ✅ Complete |
-| [`qt/floating_copilot.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/qt/floating_copilot.py) | **Draggable, Collapsible & Expandable Floating AI Copilot Widget** overlaid on 3D canvas | ✅ Complete |
-| [`qt/viewport.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/qt/viewport.py) | Hardware-accelerated 3D Viewport canvas with anti-aliasing, face picking, and HUD buttons | ✅ Complete |
-| [`qt/main_window.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/qt/main_window.py) | Modern PySide6 CAD IDE window with ribbon toolbar, splitter panels, tree widget, and status bar | ✅ Complete |
+| [`qt/styles.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/qt/styles.py) | SolidWorks & PTC Creo dark slate QSS stylesheet with `#00A8FF` CAD blue accents and precision controls | ✅ Complete |
+| [`qt/activity_bar.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/qt/activity_bar.py) | Clean CAD vertical icon strip (`Tree`, `Feat`, `Prop`, `AI`, `Cfg`) without emojis | ✅ Complete |
+| [`qt/floating_copilot.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/qt/floating_copilot.py) | **Engineering HUD Parametric Copilot Command Prompt** with ghost preview overlay | ✅ Complete |
+| [`qt/viewport.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/qt/viewport.py) | SolidWorks slate studio gradient canvas, diffuse metallic shading, dark silhouette edges, centered heads-up view toolbar, and 3D coordinate triad | ✅ Complete |
+| [`qt/main_window.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/qt/main_window.py) | CommandManager ribbon with tabs (`Features`, `Sketch`, `Evaluate`, `Parametric Copilot`, `I/O`), FeatureManager tree with datums, and MMGS status bar | ✅ Complete |
 | [`app/main_qt.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/app/main_qt.py) | PySide6 application bootstrap entry point | ✅ Complete |
 
 ---
@@ -91,10 +97,10 @@
 py run_tests.py
 ```
 
-### Test Suites Summary (33 Tests)
+### Test Suites Summary (33 Tests Passing)
 | Test File | Covered Functionality | Result |
 | :--- | :--- | :--- |
-| [`tests/test_qt_ide_components.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/tests/test_qt_ide_components.py) | PySide6 QSS stylesheet tokens, document and CAD agent bindings | ✅ Passed |
+| [`tests/test_qt_ide_components.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/tests/test_qt_ide_components.py) | PySide6 SolidWorks/Creo QSS tokens, document and CAD agent bindings | ✅ Passed |
 | [`tests/test_ui_theme_and_workspace_settings.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/tests/test_ui_theme_and_workspace_settings.py) | Floating AI Copilot widget lifecycle, Activity Bar navigation, 8 theme palettes, True Black OLED mode, Charcoal grey contrast, theme registration, and workspace settings persistence | ✅ Passed |
 | [`tests/test_v03_ai_copilot_and_advanced_features.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/tests/test_v03_ai_copilot_and_advanced_features.py) | ISO Metric Hole Wizard, Shell hollowing, Cloud Provider fallback, and AI Ghost preview generation | ✅ Passed |
 | [`tests/test_constraint_solver.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/tests/test_constraint_solver.py) | 2D Geometric constraint solver: Coincident, Fixed, Horizontal, Vertical, Radius, and DOF diagnostics | ✅ Passed |
@@ -109,12 +115,12 @@ py run_tests.py
 
 ## 💻 Manual Verification Checklist
 
-1. **Launch PySide6 CAD IDE:**
+1. **Launch Desktop CAD IDE:**
    ```bash
-   py src/softwork/app/main_qt.py
+   py src/softwork/app/main.py
    ```
-2. **Floating AI Copilot:**
-   - Click and drag the `✨ SoftWork Copilot` header to move the chat widget anywhere in the 3D workspace.
-   - Click `▲` / `▼` to collapse into a compact prompt pill or expand into full conversational log with quick prompt chips.
-3. **Modern IDE Activity Bar:** Click the left vertical icons (`📁 Tree`, `🛠️ Tools`, `📊 Inspector`) to switch views.
-4. **Hardware Antialiasing & 3D Shading:** Real-time diffuse shading, face picking, and glowing ghost wireframes.
+2. **CommandManager Ribbon:** Click through tabs (`Features`, `Sketch`, `Evaluate`, `Parametric Copilot`, `I/O & History`).
+3. **FeatureManager Design Tree:** Observe standard datum planes (`Front Plane`, `Top Plane`, `Right Plane`, `Origin`) and parametric feature nodes.
+4. **SolidWorks Heads-Up View Toolbar:** Click centered buttons (`[Fit]`, `[Iso]`, `[Top]`, `[Front]`, `[Right]`).
+5. **Parametric Copilot HUD:** Drag HUD across 3D viewport canvas; run natural language instructions with ghost geometry preview.
+
