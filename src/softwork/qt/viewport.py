@@ -67,6 +67,14 @@ class CADQtViewport(QWidget):
         # HUD Quick View Buttons [(label, rect, action)]
         self._hud_buttons: List[Tuple[str, QRect, Callable[[], None]]] = []
 
+    def set_tool_mode(self, mode: str, active_plane: Optional[Any] = None) -> None:
+        self.tool_mode = mode
+        if active_plane is not None:
+            self.active_sketch_plane = active_plane
+        self._draw_start_uv = None
+        self._draw_cur_uv = None
+        self.update()
+
     def set_mesh(self, mesh: Optional[MeshData]) -> None:
         self._mesh = mesh
         self.selected_face_idx = None
@@ -113,6 +121,65 @@ class CADQtViewport(QWidget):
         self.rot_x = 35.264
         self.rot_y = -45.0
         self.update()
+
+    def unproject_to_plane(self, screen_x: float, screen_y: float, plane: Any) -> Tuple[float, float]:
+        """Calculates 2D (u, v) on the sketch plane from 2D screen mouse coordinates."""
+        w = self.width() or 800
+        h = self.height() or 600
+        cx, cy = w / 2.0, h / 2.0
+        rad_x = math.radians(self.rot_x)
+        rad_y = math.radians(self.rot_y)
+
+        x2 = (screen_x - cx - self.pan_x) / max(0.001, self.zoom)
+        y2 = -(screen_y - cy - self.pan_y) / max(0.001, self.zoom)
+
+        cos_x, sin_x = math.cos(-rad_x), math.sin(-rad_x)
+        cos_y, sin_y = math.cos(-rad_y), math.sin(-rad_y)
+
+        rx_d_y = sin_x
+        rx_d_z = cos_x
+        ray_dx = -sin_y * rx_d_z
+        ray_dy = rx_d_y
+        ray_dz = cos_y * rx_d_z
+
+        rx_o_y = y2 * cos_x
+        rx_o_z = -y2 * sin_x
+        ray_ox = x2 * cos_y + rx_o_z * sin_y
+        ray_oy = rx_o_y
+        ray_oz = -x2 * sin_y + rx_o_z * cos_y
+
+        p0 = getattr(plane, "origin", None)
+        n = getattr(plane, "normal", None)
+        u_axis = getattr(plane, "u_axis", None)
+        v_axis = getattr(plane, "v_axis", None)
+
+        p0_x = getattr(p0, "x", 0.0)
+        p0_y = getattr(p0, "y", 0.0)
+        p0_z = getattr(p0, "z", 0.0)
+        nx = getattr(n, "x", 0.0)
+        ny = getattr(n, "y", 0.0)
+        nz = getattr(n, "z", 1.0)
+        ux = getattr(u_axis, "x", 1.0)
+        uy = getattr(u_axis, "y", 0.0)
+        uz = getattr(u_axis, "z", 0.0)
+        vx = getattr(v_axis, "x", 0.0)
+        vy = getattr(v_axis, "y", 1.0)
+        vz = getattr(v_axis, "z", 0.0)
+
+        denom = nx * ray_dx + ny * ray_dy + nz * ray_dz
+        t = 0.0 if abs(denom) < 1e-6 else (nx * (p0_x - ray_ox) + ny * (p0_y - ray_oy) + nz * (p0_z - ray_oz)) / denom
+
+        hit_x = ray_ox + t * ray_dx
+        hit_y = ray_oy + t * ray_dy
+        hit_z = ray_oz + t * ray_dz
+
+        rel_x = hit_x - p0_x
+        rel_y = hit_y - p0_y
+        rel_z = hit_z - p0_z
+
+        u = rel_x * ux + rel_y * uy + rel_z * uz
+        v = rel_x * vx + rel_y * vy + rel_z * vz
+        return u, v
 
     def _project_point(self, x: float, y: float, z: float, cx: float, cy: float, rad_x: float, rad_y: float) -> Tuple[float, float, float]:
         cos_y, sin_y = math.cos(rad_y), math.sin(rad_y)
@@ -207,7 +274,6 @@ class CADQtViewport(QWidget):
                     border_color = QColor("#FFE066")
                     pen_w = 2
                 else:
-                    # High contrast electric cyan solid with diffuse shading
                     r = int(min(255, max(10, 0 * diff)))
                     g = int(min(255, max(40, 240 * diff)))
                     b = int(min(255, max(50, 255 * diff)))
@@ -220,7 +286,7 @@ class CADQtViewport(QWidget):
                 painter.setPen(QPen(border_color, pen_w))
                 painter.drawPolygon(qpoly)
 
-            # Draw crisp wireframe edges
+            # Wireframe edges
             if self._mesh.edges:
                 painter.setPen(QPen(QColor("#00F0FF"), 1.5))
                 for edge in self._mesh.edges:
@@ -242,7 +308,6 @@ class CADQtViewport(QWidget):
                 qpoly = QPolygonF([QPoint(int(gv0[0]), int(gv0[1])), QPoint(int(gv1[0]), int(gv1[1])), QPoint(int(gv2[0]), int(gv2[1]))])
                 painter.drawPolygon(qpoly)
 
-            # AI Ghost Badge
             badge_rect = QRect(w - 180, 16, 165, 42)
             painter.setBrush(QBrush(QColor("#141414")))
             painter.setPen(QPen(QColor("#FFB800"), 1.5))
@@ -281,6 +346,26 @@ class CADQtViewport(QWidget):
                 painter.setPen(QPen(QColor("#008844"), 1))
                 for px, py, _ in proj_pts:
                     painter.drawEllipse(QPoint(int(px), int(py)), 3, 3)
+
+        # 3.5 In-progress interactive drawing preview
+        if self.tool_mode != "SELECT" and self._draw_start_uv and self._draw_cur_uv and self.active_sketch_plane:
+            pl = self.active_sketch_plane
+            u0, v0 = self._draw_start_uv
+            u1, v1 = self._draw_cur_uv
+
+            if self.tool_mode == "DRAW_RECTANGLE":
+                pts_rect = [(u0, v0), (u1, v0), (u1, v1), (u0, v1)]
+                p3_rect = [pl.to_3d(u, v, 0.0) for u, v in pts_rect]
+                proj_r = [self._project_point(p.x, p.y, p.z, cx, cy, rad_x, rad_y) for p in p3_rect]
+                painter.setPen(QPen(QColor("#00F0FF"), 2, Qt.DashLine))
+                for ri in range(4):
+                    rnxt = (ri + 1) % 4
+                    painter.drawLine(int(proj_r[ri][0]), int(proj_r[ri][1]), int(proj_r[rnxt][0]), int(proj_r[rnxt][1]))
+                w_mm = abs(u1 - u0)
+                h_mm = abs(v1 - v0)
+                painter.setPen(QColor("#00F0FF"))
+                painter.setFont(QFont("Segoe UI", 9, QFont.Bold))
+                painter.drawText(int(proj_r[2][0] + 12), int(proj_r[2][1] - 8), f"📐 {w_mm:.1f} × {h_mm:.1f} mm")
 
         # 4. Viewport HUD Navigation Quick Buttons (Top-Left)
         self._hud_buttons = [
@@ -327,10 +412,23 @@ class CADQtViewport(QWidget):
         self._drag_dist = 0.0
         self._is_panning = bool(event.modifiers() & Qt.ShiftModifier)
 
+        if self.tool_mode != "SELECT" and self.active_sketch_plane:
+            u, v = self.unproject_to_plane(pos.x(), pos.y(), self.active_sketch_plane)
+            self._draw_start_uv = (u, v)
+            self._draw_cur_uv = (u, v)
+            self.update()
+
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
-        delta = event.pos() - self._last_mouse_pos
+        pos = event.pos()
+        delta = pos - self._last_mouse_pos
         self._drag_dist += abs(delta.x()) + abs(delta.y())
-        self._last_mouse_pos = event.pos()
+        self._last_mouse_pos = pos
+
+        if self.tool_mode != "SELECT" and self.active_sketch_plane and self._draw_start_uv:
+            u, v = self.unproject_to_plane(pos.x(), pos.y(), self.active_sketch_plane)
+            self._draw_cur_uv = (u, v)
+            self.update()
+            return
 
         if event.buttons() & Qt.RightButton or (event.buttons() & Qt.LeftButton and self._is_panning):
             self.pan_x += delta.x()
@@ -342,6 +440,28 @@ class CADQtViewport(QWidget):
             self.update()
 
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:
+        if self.tool_mode != "SELECT" and self._draw_start_uv and self._draw_cur_uv:
+            u0, v0 = self._draw_start_uv
+            u1, v1 = self._draw_cur_uv
+            shape_type = self.tool_mode.replace("DRAW_", "").lower()
+
+            if shape_type == "rectangle":
+                w = abs(u1 - u0)
+                h = abs(v1 - v0)
+                if w > 1.0 and h > 1.0:
+                    cu = (u0 + u1) / 2.0
+                    cv = (v0 + v1) / 2.0
+                    self.shapeDrawn.emit("rectangle", {"width": w, "height": h, "center_u": cu, "center_v": cv, "centered": True})
+            elif shape_type == "circle":
+                r = math.hypot(u1 - u0, v1 - v0)
+                if r > 1.0:
+                    self.shapeDrawn.emit("circle", {"radius": r, "center_u": u0, "center_v": v0})
+
+            self._draw_start_uv = None
+            self._draw_cur_uv = None
+            self.update()
+            return
+
         if self._drag_dist < 5.0 and event.button() == Qt.LeftButton:
             self._pick_face(event.pos().x(), event.pos().y())
 
