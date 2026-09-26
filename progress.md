@@ -21,13 +21,15 @@
 
 ## 🏗️ Completed Implementation
 
-### 1. 2D Sketching & Profile Subsystem (`softwork.sketch`) — *v0.2*
+### 1. 2D Sketching, Constraints & Profile Subsystem (`softwork.sketch`) — *v0.2*
 | Module / File | Description | Status |
 | :--- | :--- | :--- |
 | [`sketch/plane.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/sketch/plane.py) | Datum planes (`XY`, `XZ`, `YZ`) and 2D-to-3D coordinate projection | ✅ Complete |
 | [`sketch/elements.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/sketch/elements.py) | 2D geometric entities (`Line2D`, `Circle2D`, `Rectangle2D`, `Polygon2D`) | ✅ Complete |
 | [`sketch/profile.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/sketch/profile.py) | Closed boundary loop detection & Shoelace polygon area calculation | ✅ Complete |
-| [`sketch/sketch.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/sketch/sketch.py) | 2D Sketch container managing plane, elements, and profiles | ✅ Complete |
+| [`sketch/constraints.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/sketch/constraints.py) | 2D geometric constraints (`Coincident`, `Horizontal`, `Vertical`, `Distance`, `Length`, `Radius`, `Fixed`) | ✅ Complete |
+| [`sketch/solver.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/sketch/solver.py) | Gauss-Newton / Levenberg-Marquardt numerical constraint solver with DOF estimation | ✅ Complete |
+| [`sketch/sketch.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/sketch/sketch.py) | 2D Sketch container managing plane, elements, constraints, and profiles | ✅ Complete |
 
 ### 2. Parametric Features (`softwork.core.feature`) — *v0.1 & v0.2*
 | Feature Class | Description | Status |
@@ -69,8 +71,8 @@
 ### 6. Desktop User Interface (`softwork.ui`)
 | Module / File | Description | Status |
 | :--- | :--- | :--- |
-| [`ui/viewport.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/ui/viewport.py) | 3D Canvas with Orbit, Pan, Zoom, Lighting, **2D Sketch Wireframe / Vertex Dot Rasterization**, and **Interactive Face Raycasting Picking** | ✅ Complete |
-| [`ui/main_window.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/ui/main_window.py) | Menubar, Design Toolbar (`Sketch`, `Extrude`, `Revolve`, `Pattern`, `Chamfer`), Tree, Properties with sketch shape shortcuts, AI Bar | ✅ Complete |
+| [`ui/viewport.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/ui/viewport.py) | 3D Canvas with Orbit, Pan, Zoom, Lighting, **Interactive Click-and-Drag 2D Drawing** (Rect, Circle, Line), **Real-Time Dimension Labels**, and **Face Picking** | ✅ Complete |
+| [`ui/main_window.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/ui/main_window.py) | Tool Switcher (`Select`, `Rect`, `Circle`, `Line`), Constraint Inspector & Solver button, Menubar, Design Toolbar, Tree, Properties, AI Bar | ✅ Complete |
 | [`app/main.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/app/main.py) | Application bootstrap and CLI entry point | ✅ Complete |
 
 ---
@@ -82,9 +84,10 @@
 py run_tests.py
 ```
 
-### Test Suites Summary (17 Tests)
+### Test Suites Summary (20 Tests)
 | Test File | Covered Functionality | Result |
 | :--- | :--- | :--- |
+| [`tests/test_constraint_solver.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/tests/test_constraint_solver.py) | 2D Geometric constraint solver: Coincident, Fixed, Horizontal, Vertical, Radius, and DOF diagnostics | ✅ Passed |
 | [`tests/test_sketch_and_profiles.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/tests/test_sketch_and_profiles.py) | Sketch plane transforms, rectangle/circle 2D profiles, Shoelace area, and loop detection | ✅ Passed |
 | [`tests/test_v02_parametric_features.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/tests/test_v02_parametric_features.py) | Sketch extrusion, multi-solid boolean join on mounting plate, revolution, linear pattern, chamfer, and AI agent sketch-to-extrude flow | ✅ Passed |
 | [`tests/test_geometry_and_backend.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/tests/test_geometry_and_backend.py) | Box creation, mounting plate with holes, tessellation, bounds, volume, and fillet validation | ✅ Passed |
@@ -92,22 +95,21 @@ py run_tests.py
 | [`tests/test_ai_agent_and_tools.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/tests/test_ai_agent_and_tools.py) | CAD agent natural-language creation, hole additions, filleting, and thickness update | ✅ Passed |
 | [`tests/test_formats_and_serialization.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/tests/test_formats_and_serialization.py) | Save/load `.softwork` document files, STEP AP214 export, and binary STL exports | ✅ Passed |
 
-**Result:** 17 tests ran in 2.268s — **100% OK**.
+**Result:** 20 tests ran in 0.160s — **100% OK**.
 
 ---
 
 ## 🚀 How to Run SoftWork
 
-### 1. Launch the Desktop GUI (v0.2)
+### 1. Launch the Desktop GUI (v0.2+)
 ```bash
 py src/softwork/app/main.py
 ```
-- **2D Visual Sketching in 3D Viewport:** Active sketches render emerald wire loops, vertex dots, datum plane boundary lines, and sketch origin tags.
+- **Interactive Viewport Drawing:** Click `▭ Rect`, `⭕ Circle`, or `╱ Line` on the toolbar, then click & drag directly on the 3D viewport canvas. Real-time rubber-band bounding box and live dimension labels appear as you drag.
+- **2D Geometric Constraint Solver:** In the Properties panel for any sketch, inspect degrees of freedom (DOF) and click `📐 Solve Constraints (DOF)` to resolve geometric constraints.
 - **Extrude on Mounting Plate:** Extrusions created on top of base plates automatically boolean-join and recalculate composite solid volume.
 - **3D Face Picking:** Click on any surface in the 3D viewport to highlight it in gold and view normal/index in the status bar.
-- **Quick Sketch Shortcuts:** Properties inspector provides instant `➕ 50×30 Rect`, `➕ R15 Circle`, and `🚀 Extrude This Sketch` buttons.
-- **Revolve:** Click `🔁 Revolve` or type `"Revolve the sketch by 360 degrees"`.
-- **Linear Pattern & Chamfer:** Duplicate parts into array patterns and apply edge chamfers.
+- **Revolve & Pattern:** Revolve profiles into solids or duplicate features into array patterns.
 
 ---
 
