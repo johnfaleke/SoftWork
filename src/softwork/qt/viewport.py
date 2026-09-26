@@ -1,5 +1,7 @@
 """
 Professional High-Performance 3D CAD Viewport for SoftWork (PTC Creo & SolidWorks aesthetic).
+Features direct in-viewport contextual mini-toolbar, ground drop shadow, diffuse metallic shading,
+crisp silhouette edges, heads-up view toolbar, and interactive sketch raycasting.
 """
 from __future__ import annotations
 import math
@@ -22,6 +24,7 @@ try:
         QWheelEvent,
         QPaintEvent,
         QLinearGradient,
+        QRadialGradient,
     )
 except ImportError:
     pass
@@ -30,11 +33,12 @@ except ImportError:
 class CADQtViewport(QWidget):
     """
     High-fidelity 3D Viewport canvas for PySide6 CAD IDE.
-    Implements SolidWorks and PTC Creo style gradient background, heads-up view toolbar,
-    anti-aliased shaded geometry, crisp wireframes, 3D triad, and interactive raycasting.
+    Implements SolidWorks and PTC Creo style gradient background, ground drop shadow,
+    context-sensitive in-viewport mini-toolbar, heads-up view toolbar, and 3D triad.
     """
     faceSelected = Signal(int, tuple)
     shapeDrawn = Signal(str, dict)
+    actionTriggered = Signal(str, object)  # e.g. ("sketch_on_face", face_idx), ("extrude_face", face_idx)
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
@@ -65,10 +69,14 @@ class CADQtViewport(QWidget):
         self._ghost_delta_vol: float = 0.0
         self._sketches: List[Any] = []
         self.selected_face_idx: Optional[int] = None
+        self.selected_face_norm: Optional[Tuple[float, float, float]] = None
+        self.selected_face_screen_pos: Optional[QPoint] = None
         self._rendered_faces: List[Tuple[int, List[Tuple[float, float]], Tuple[float, float, float]]] = []
 
         # Heads-Up View Toolbar [(label, rect, action)]
         self._hud_buttons: List[Tuple[str, QRect, Callable[[], None]]] = []
+        # Contextual Face Mini-Toolbar [(label, rect, action_id)]
+        self._context_buttons: List[Tuple[str, QRect, str]] = []
 
     def set_tool_mode(self, mode: str, active_plane: Optional[Any] = None) -> None:
         self.tool_mode = mode
@@ -81,6 +89,8 @@ class CADQtViewport(QWidget):
     def set_mesh(self, mesh: Optional[MeshData]) -> None:
         self._mesh = mesh
         self.selected_face_idx = None
+        self.selected_face_norm = None
+        self.selected_face_screen_pos = None
         self._ghost_mesh = None
         self._ghost_delta_vol = 0.0
         self.update()
@@ -103,6 +113,7 @@ class CADQtViewport(QWidget):
         self.pan_x = 0.0
         self.pan_y = 0.0
         self.selected_face_idx = None
+        self.selected_face_screen_pos = None
         self.update()
 
     def set_view_top(self) -> None:
@@ -123,6 +134,26 @@ class CADQtViewport(QWidget):
     def set_view_isometric(self) -> None:
         self.rot_x = 35.264
         self.rot_y = -45.0
+        self.update()
+
+    def set_view_normal_to_selection(self) -> None:
+        """Rotates camera to look directly normal to the currently selected face."""
+        if not self.selected_face_norm:
+            return
+        nx, ny, nz = self.selected_face_norm
+        # Calculate elevation and azimuth from normal vector
+        norm_len = math.sqrt(nx * nx + ny * ny + nz * nz)
+        if norm_len < 1e-6:
+            return
+        nx, ny, nz = nx / norm_len, ny / norm_len, nz / norm_len
+
+        # Elevation angle (rot_x)
+        elev = math.degrees(math.asin(max(-1.0, min(1.0, nz))))
+        # Azimuth angle (rot_y)
+        azim = math.degrees(math.atan2(-nx, ny)) if (abs(nx) > 1e-4 or abs(ny) > 1e-4) else 0.0
+
+        self.rot_x = elev
+        self.rot_y = azim
         self.update()
 
     def unproject_to_plane(self, screen_x: float, screen_y: float, plane: Any) -> Tuple[float, float]:
@@ -233,6 +264,28 @@ class CADQtViewport(QWidget):
             p4 = self._project_point(g, grid_size, 0.0, cx, cy, rad_x, rad_y)
             painter.drawLine(int(p3[0]), int(p3[1]), int(p4[0]), int(p4[1]))
 
+        # 1.5 SolidWorks Studio Ground Contact Shadow (Soft Ambient Shadow on Z=0 Plane)
+        if self._mesh and self._mesh.vertices:
+            xs = [v[0] for v in self._mesh.vertices]
+            ys = [v[1] for v in self._mesh.vertices]
+            if xs and ys:
+                min_x, max_x = min(xs), max(xs)
+                min_y, max_y = min(ys), max(ys)
+                # Project shadow polygon on Z = 0
+                sp0 = self._project_point(min_x, min_y, 0.0, cx, cy, rad_x, rad_y)
+                sp1 = self._project_point(max_x, min_y, 0.0, cx, cy, rad_x, rad_y)
+                sp2 = self._project_point(max_x, max_y, 0.0, cx, cy, rad_x, rad_y)
+                sp3 = self._project_point(min_x, max_y, 0.0, cx, cy, rad_x, rad_y)
+                shadow_poly = QPolygonF([
+                    QPoint(int(sp0[0]), int(sp0[1])),
+                    QPoint(int(sp1[0]), int(sp1[1])),
+                    QPoint(int(sp2[0]), int(sp2[1])),
+                    QPoint(int(sp3[0]), int(sp3[1])),
+                ])
+                painter.setBrush(QBrush(QColor(10, 12, 16, 120)))
+                painter.setPen(Qt.NoPen)
+                painter.drawPolygon(shadow_poly)
+
         # 2. Render 3D Solid Geometry (CAD Metallic Shaded with Silhouette Edges)
         self._rendered_faces.clear()
         if self._mesh and self._mesh.faces:
@@ -331,7 +384,7 @@ class CADQtViewport(QWidget):
             painter.setFont(QFont("Segoe UI", 8))
             painter.drawText(w - 180, 44, f"Predicted Δ Vol: {vol_str}")
 
-        # 3. Render 2D Sketches (SolidWorks Under Defined / Fully Defined Blue/Black lines)
+        # 3. Render 2D Sketches (SolidWorks Blue lines)
         for sketch in self._sketches:
             plane = getattr(sketch, "plane", None)
             if not plane:
@@ -390,8 +443,8 @@ class CADQtViewport(QWidget):
             ("Top", QRect(start_hud_x + (hud_btn_w + hud_spacing) * 2, 10, hud_btn_w, hud_btn_h), self.set_view_top),
             ("Front", QRect(start_hud_x + (hud_btn_w + hud_spacing) * 3, 10, hud_btn_w, hud_btn_h), self.set_view_front),
             ("Right", QRect(start_hud_x + (hud_btn_w + hud_spacing) * 4, 10, hud_btn_w, hud_btn_h), self.set_view_right),
-            ("Sect", QRect(start_hud_x + (hud_btn_w + hud_spacing) * 5, 10, hud_btn_w, hud_btn_h), lambda: None),
-            ("Style", QRect(start_hud_x + (hud_btn_w + hud_spacing) * 6, 10, hud_btn_w, hud_btn_h), lambda: None),
+            ("Norm", QRect(start_hud_x + (hud_btn_w + hud_spacing) * 5, 10, hud_btn_w, hud_btn_h), self.set_view_normal_to_selection),
+            ("Sect", QRect(start_hud_x + (hud_btn_w + hud_spacing) * 6, 10, hud_btn_w, hud_btn_h), lambda: None),
         ]
 
         painter.setFont(QFont("Segoe UI", 8, QFont.Bold))
@@ -401,6 +454,41 @@ class CADQtViewport(QWidget):
             painter.drawRoundedRect(rect, 2, 2)
             painter.setPen(QColor("#DCE1E8"))
             painter.drawText(rect, Qt.AlignCenter, label)
+
+        # 4.5 Context-Sensitive In-Viewport Mini-Toolbar (Direct SolidWorks 3D Interaction)
+        self._context_buttons.clear()
+        if self.selected_face_idx is not None and self.selected_face_screen_pos:
+            cx_pos = self.selected_face_screen_pos.x() + 15
+            cy_pos = max(50, self.selected_face_screen_pos.y() - 35)
+
+            actions = [
+                ("Sketch", "sketch_on_face"),
+                ("Extrude", "extrude_face"),
+                ("Hole", "hole_on_face"),
+                ("Fillet", "fillet_face"),
+                ("Normal To", "normal_to_face"),
+            ]
+            c_btn_w = 54
+            c_btn_h = 22
+            c_gap = 2
+            total_c_w = len(actions) * c_btn_w + (len(actions) - 1) * c_gap
+
+            # Draw background capsule for contextual mini-toolbar
+            bg_rect = QRect(cx_pos - 4, cy_pos - 3, total_c_w + 8, c_btn_h + 6)
+            painter.setBrush(QBrush(QColor("#1E2227")))
+            painter.setPen(QPen(QColor("#00A8FF"), 1))
+            painter.drawRoundedRect(bg_rect, 3, 3)
+
+            painter.setFont(QFont("Segoe UI", 8, QFont.Bold))
+            for ci, (clabel, cact) in enumerate(actions):
+                c_rect = QRect(cx_pos + ci * (c_btn_w + c_gap), cy_pos, c_btn_w, c_btn_h)
+                self._context_buttons.append((clabel, c_rect, cact))
+
+                painter.setBrush(QBrush(QColor("#282C34")))
+                painter.setPen(QPen(QColor("#3E4451"), 1))
+                painter.drawRoundedRect(c_rect, 2, 2)
+                painter.setPen(QColor("#00A8FF") if ci == 0 else QColor("#DCE1E8"))
+                painter.drawText(c_rect, Qt.AlignCenter, clabel)
 
         # 5. 3D Coordinate Triad (Bottom-Left)
         axis_cx, axis_cy = 45, h - 45
@@ -426,6 +514,16 @@ class CADQtViewport(QWidget):
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
         pos = event.pos()
+
+        # Check Context Mini-Toolbar buttons first
+        for _, rect, act_id in self._context_buttons:
+            if rect.contains(pos):
+                if act_id == "normal_to_face":
+                    self.set_view_normal_to_selection()
+                else:
+                    self.actionTriggered.emit(act_id, self.selected_face_idx)
+                return
+
         # Check HUD buttons
         for _, rect, action in self._hud_buttons:
             if rect.contains(pos):
@@ -505,6 +603,8 @@ class CADQtViewport(QWidget):
                 break
 
         self.selected_face_idx = picked_idx
+        self.selected_face_norm = picked_norm
+        self.selected_face_screen_pos = QPoint(mouse_x, mouse_y) if picked_idx is not None else None
         self.update()
 
         if picked_idx is not None:
