@@ -226,6 +226,12 @@ class MainWindow(tk.Tk):
         mesh = self.document.backend.to_mesh(solid) if solid else None
         self.viewport.set_mesh(mesh)
 
+        sketches = [
+            f.sketch for f in self.document.active_part.features
+            if isinstance(f, SketchFeature) and getattr(f, "sketch", None) is not None
+        ]
+        self.viewport.set_sketches(sketches)
+
         self.tree.delete(*self.tree.get_children())
         part_node = self.tree.insert("", tk.END, text=self.document.active_part.name, open=True)
         for feat in self.document.active_part.features:
@@ -244,7 +250,9 @@ class MainWindow(tk.Tk):
             self.status_bar.config(text=f"⚠️ Validation Issue: {val.issues[0].message}", fg="#EF4444")
         else:
             vol = solid.volume if solid else 0.0
-            self.status_bar.config(text=f"✓ Solid Valid | Volume: {vol:,.1f} mm³ | Backend: {self.document.backend.name()}", fg="#10B981")
+            num_sk = len(sketches)
+            sk_info = f" | {num_sk} Sketch(es) active" if num_sk > 0 else ""
+            self.status_bar.config(text=f"✓ Solid Valid | Volume: {vol:,.1f} mm³{sk_info} | Backend: {self.document.backend.name()}", fg="#10B981")
 
     def _refresh_properties(self) -> None:
         for widget in self.props_container.winfo_children():
@@ -252,7 +260,7 @@ class MainWindow(tk.Tk):
 
         feat_id = self.document.selection.primary_feature_id
         if not feat_id and self.document.active_part.features:
-            feat_id = self.document.active_part.features[0].id
+            feat_id = self.document.active_part.features[-1].id
 
         feature = self.document.get_feature(feat_id) if feat_id else None
         if not feature:
@@ -266,9 +274,18 @@ class MainWindow(tk.Tk):
         # Show sketch profile details if SketchFeature
         if isinstance(feature, SketchFeature):
             tk.Label(self.props_container, text=f"Plane: {feature.sketch.plane.plane_type.value}", bg="#0F172A", fg="#E2E8F0").pack(anchor=tk.W, pady=4)
-            tk.Label(self.props_container, text=f"Profiles: {len(feature.sketch.profiles)} closed loop(s)", bg="#0F172A", fg="#10B981").pack(anchor=tk.W, pady=2)
-            btn_add_rect = ttk.Button(self.props_container, text="➕ Add 80x50 Rect", command=lambda: self._add_rect_to_sketch(feature))
-            btn_add_rect.pack(fill=tk.X, pady=4)
+            num_prof = len(feature.sketch.profiles)
+            num_el = len(feature.sketch.elements)
+            tk.Label(self.props_container, text=f"Elements: {num_el} | Profiles: {num_prof} closed loop(s)", bg="#0F172A", fg="#10B981").pack(anchor=tk.W, pady=2)
+            
+            btn_frame = tk.Frame(self.props_container, bg="#0F172A")
+            btn_frame.pack(fill=tk.X, pady=6)
+            btn_add_rect = ttk.Button(btn_frame, text="➕ 50×30 Rect", command=lambda: self._add_rect_to_sketch(feature, 50.0, 30.0))
+            btn_add_rect.pack(fill=tk.X, pady=2)
+            btn_add_circ = ttk.Button(btn_frame, text="➕ R15 Circle", command=lambda: self._add_circ_to_sketch(feature, 15.0))
+            btn_add_circ.pack(fill=tk.X, pady=2)
+            btn_ext = ttk.Button(btn_frame, text="🚀 Extrude This Sketch", style="Accent.TButton", command=self._action_extrude_sketch)
+            btn_ext.pack(fill=tk.X, pady=4)
             return
 
         for param_name, param in feature.parameters.items():
@@ -289,8 +306,13 @@ class MainWindow(tk.Tk):
             btn = ttk.Button(row, text="Apply", width=6, command=make_handler(feature.id, param_name, entry))
             btn.pack(side=tk.RIGHT, padx=2)
 
-    def _add_rect_to_sketch(self, sk_feat: SketchFeature) -> None:
-        sk_feat.sketch.add_rectangle(80.0, 50.0, centered=True)
+    def _add_rect_to_sketch(self, sk_feat: SketchFeature, w: float = 50.0, h: float = 30.0) -> None:
+        sk_feat.sketch.add_rectangle(w, h, centered=True)
+        self.document.recompute()
+        self._refresh_all()
+
+    def _add_circ_to_sketch(self, sk_feat: SketchFeature, r: float = 15.0) -> None:
+        sk_feat.sketch.add_circle(r)
         self.document.recompute()
         self._refresh_all()
 
@@ -322,41 +344,62 @@ class MainWindow(tk.Tk):
 
     def _action_create_sketch(self, plane: str = "XY") -> None:
         CreateSketchCommand(name=f"Sketch_{plane}", plane_type=StandardPlane(plane)).execute(self.document)
+        # Select and populate default profile so it's immediately visible
+        sk_feat = self.document.active_part.features[-1]
+        if isinstance(sk_feat, SketchFeature):
+            sk_feat.sketch.add_rectangle(60.0, 40.0, centered=True)
+            self.document.selection.select_feature(sk_feat.id)
+            self.document.recompute()
+            self._refresh_all()
 
     def _action_extrude_sketch(self) -> None:
         sk_feat = None
-        for f in self.document.active_part.features:
+        # Check selected feature
+        sel_id = self.document.selection.primary_feature_id
+        if sel_id:
+            f = self.document.get_feature(sel_id)
             if isinstance(f, SketchFeature):
                 sk_feat = f
-                break
+
         if not sk_feat:
-            # Create a sketch with rectangle first
-            sk_feat = CreateSketchCommand(name="Sketch_XY", plane_type=StandardPlane.XY).execute(self.document).changes[0]
-            for f in self.document.active_part.features:
+            for f in reversed(self.document.active_part.features):
                 if isinstance(f, SketchFeature):
                     sk_feat = f
                     break
-            if isinstance(sk_feat, SketchFeature):
-                sk_feat.sketch.add_rectangle(100.0, 60.0, centered=True)
 
-        ExtrudeSketchCommand(sketch_feature_id=sk_feat.id, distance=25.0).execute(self.document)
+        if not sk_feat:
+            self._action_create_sketch("XY")
+            sk_feat = self.document.active_part.features[-1]
+
+        if isinstance(sk_feat, SketchFeature):
+            if not sk_feat.sketch.elements:
+                sk_feat.sketch.add_rectangle(50.0, 30.0, centered=True)
+                self.document.recompute()
+            ExtrudeSketchCommand(sketch_feature_id=sk_feat.id, distance=25.0).execute(self.document)
+            self._refresh_all()
 
     def _action_revolve_sketch(self) -> None:
         sk_feat = None
-        for f in self.document.active_part.features:
+        sel_id = self.document.selection.primary_feature_id
+        if sel_id:
+            f = self.document.get_feature(sel_id)
             if isinstance(f, SketchFeature):
                 sk_feat = f
-                break
+
         if not sk_feat:
-            CreateSketchCommand(name="Sketch_XY", plane_type=StandardPlane.XY).execute(self.document)
-            for f in self.document.active_part.features:
+            for f in reversed(self.document.active_part.features):
                 if isinstance(f, SketchFeature):
                     sk_feat = f
                     break
+
+        if not sk_feat:
+            CreateSketchCommand(name="Sketch_XY", plane_type=StandardPlane.XY).execute(self.document)
+            sk_feat = self.document.active_part.features[-1]
             if isinstance(sk_feat, SketchFeature):
                 sk_feat.sketch.add_rectangle(30.0, 50.0, center_u=25.0, center_v=0.0)
 
         RevolveSketchCommand(sketch_feature_id=sk_feat.id, angle_deg=360.0).execute(self.document)
+        self._refresh_all()
 
     def _action_add_pattern(self) -> None:
         if self.document.active_part.features:
