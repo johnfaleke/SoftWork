@@ -126,6 +126,7 @@ class ExtrudeFeature(Feature):
         self,
         target_sketch_feature: SketchFeature,
         distance: float = 25.0,
+        operation: str = "add",
         name: str = "Extrude001",
         id: Optional[str] = None,
         provenance: str = "user",
@@ -138,6 +139,7 @@ class ExtrudeFeature(Feature):
             provenance=provenance,
         )
         self.target_sketch_feature = target_sketch_feature
+        self.operation = operation
         self.parameters = {
             "distance": Parameter(name="distance", value=distance, unit="mm", description="Extrusion distance / thickness"),
         }
@@ -149,6 +151,19 @@ class ExtrudeFeature(Feature):
 
         dist = self.parameters["distance"].canonical_value
         shape = backend.extrude_profile(profile, dist, self.target_sketch_feature.sketch.plane)
+
+        # Check for prior base solids to combine with
+        base_solid = None
+        for feat_id, s in context_shapes.items():
+            if feat_id != self.target_sketch_feature.id and s.shape_type != "sketch_wire" and s.volume > 0:
+                base_solid = s
+
+        if base_solid is not None:
+            if self.operation == "add":
+                shape = backend.union(base_solid, shape)
+            elif self.operation == "cut":
+                shape = backend.cut(base_solid, shape)
+
         self.generated_shape = shape
         self.status = FeatureStatus.VALID
         return shape
@@ -163,6 +178,7 @@ class RevolveFeature(Feature):
         target_sketch_feature: SketchFeature,
         angle_deg: float = 360.0,
         axis: str = "Y",
+        operation: str = "add",
         name: str = "Revolve001",
         id: Optional[str] = None,
         provenance: str = "user",
@@ -176,6 +192,7 @@ class RevolveFeature(Feature):
         )
         self.target_sketch_feature = target_sketch_feature
         self.axis = axis
+        self.operation = operation
         self.parameters = {
             "angle": Parameter(name="angle", value=angle_deg, unit="deg", description="Revolution angle in degrees"),
         }
@@ -187,6 +204,15 @@ class RevolveFeature(Feature):
 
         angle_deg = self.parameters["angle"].value
         shape = backend.revolve_profile(profile, angle_deg, axis=self.axis, plane=self.target_sketch_feature.sketch.plane)
+
+        base_solid = None
+        for feat_id, s in context_shapes.items():
+            if feat_id != self.target_sketch_feature.id and s.shape_type != "sketch_wire" and s.volume > 0:
+                base_solid = s
+
+        if base_solid is not None and self.operation == "add":
+            shape = backend.union(base_solid, shape)
+
         self.generated_shape = shape
         self.status = FeatureStatus.VALID
         return shape
