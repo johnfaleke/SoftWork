@@ -468,11 +468,11 @@ class CADMainWindow(QMainWindow):
 
         # Update Kernel & Rebuild Status Indicators
         caps = self.document.backend_capabilities
-        if caps.kernel_name == "CadQuery / OpenCASCADE":
+        if caps.is_authoritative_brep:
             self.lbl_status_kernel.setText("Kernel: CadQuery (B-Rep AP214)")
             self.lbl_status_kernel.setStyleSheet("color: #98C379; padding-right: 12px; font-weight: 600;")
         else:
-            self.lbl_status_kernel.setText(f"Kernel: {caps.kernel_name} (Prototype)")
+            self.lbl_status_kernel.setText(f"Kernel: {caps.name} (Prototype)")
             self.lbl_status_kernel.setStyleSheet("color: #E5C07B; padding-right: 12px; font-weight: 600;")
 
         has_failed = any(getattr(f, "status", None) and f.status.value == "failed" for f in self.document.active_part.features)
@@ -738,12 +738,13 @@ class CADMainWindow(QMainWindow):
         caps = self.document.backend_capabilities
         info = (
             f"CAD Kernel Diagnostics:\n\n"
-            f"Active Backend: {caps.kernel_name}\n"
-            f"Description: {caps.description}\n"
-            f"Authoritative Production Engine: {'Yes' if caps.is_authoritative else 'No (Development Preview)'}\n"
-            f"Exact Analytical B-Rep: {'Yes' if caps.supports_brep else 'No (Faceted Triangulation)'}\n"
+            f"Active Backend: {caps.name}\n"
+            f"Available: {'Yes' if caps.is_available else 'No'}\n"
+            f"Authoritative Production Engine: {'Yes' if caps.is_authoritative_brep else 'No (Development Preview)'}\n"
+            f"Exact Analytical B-Rep: {'Yes' if caps.is_authoritative_brep else 'No (Faceted Triangulation)'}\n"
             f"Exact Analytical STEP Export (AP214): {'Supported' if caps.supports_step else 'Blocked (Requires CadQuery/OCP)'}\n"
-            f"STL Mesh Export: {'Supported' if caps.supports_stl else 'No'}\n\n"
+            f"STL Mesh Export: {'Supported' if caps.supports_stl else 'No'}\n"
+            f"Diagnostic Details: {caps.diagnostic_message or 'Nominal'}\n\n"
             f"Note: SoftWork enforces strict geometry contracts without silent kernel degradation."
         )
         QMessageBox.information(self, "CAD Kernel Diagnostics", info)
