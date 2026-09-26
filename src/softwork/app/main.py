@@ -4,6 +4,12 @@ SoftWork Application entry point.
 from __future__ import annotations
 import sys
 import argparse
+from pathlib import Path
+
+# Automatically add src directory to sys.path if not present
+_src_dir = Path(__file__).resolve().parent.parent.parent
+if str(_src_dir) not in sys.path:
+    sys.path.insert(0, str(_src_dir))
 
 from softwork.core.document import Document
 from softwork.ui.main_window import MainWindow
