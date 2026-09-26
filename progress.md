@@ -81,11 +81,12 @@
 ### 6. Clean Desktop CAD IDE Architecture (`softwork.qt`) — *SolidWorks & PTC Creo Standard*
 | Module / File | Description | Status |
 | :--- | :--- | :--- |
+| [`core/material.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/core/material.py) | Standard CAD material library (Steel, Aluminum, Titanium, Polymers) with mass, density, and physical properties | ✅ Complete |
 | [`qt/styles.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/qt/styles.py) | SolidWorks & PTC Creo dark slate QSS stylesheet with `#00A8FF` CAD blue accents and precision controls | ✅ Complete |
 | [`qt/activity_bar.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/qt/activity_bar.py) | Clean CAD vertical icon strip (`Tree`, `Feat`, `Prop`, `AI`, `Cfg`) without emojis | ✅ Complete |
 | [`qt/floating_copilot.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/qt/floating_copilot.py) | **Engineering HUD Parametric Copilot Command Prompt** with ghost preview overlay | ✅ Complete |
-| [`qt/viewport.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/qt/viewport.py) | SolidWorks slate studio gradient canvas, diffuse metallic shading, dark silhouette edges, centered heads-up view toolbar, and 3D coordinate triad | ✅ Complete |
-| [`qt/main_window.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/qt/main_window.py) | CommandManager ribbon with tabs (`Features`, `Sketch`, `Evaluate`, `Parametric Copilot`, `I/O`), FeatureManager tree with datums, and MMGS status bar | ✅ Complete |
+| [`qt/viewport.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/qt/viewport.py) | SolidWorks slate studio gradient canvas, ground drop shadow, in-viewport contextual mini-toolbar, diffuse metallic shading, silhouette edges, and 3D coordinate triad | ✅ Complete |
+| [`qt/main_window.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/qt/main_window.py) | CommandManager ribbon with tabs, top-bar universal CAD/AI prompt box, FeatureManager tree with datums & materials, PropertyManager mass evaluation, and MMGS status bar | ✅ Complete |
 | [`app/main_qt.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/app/main_qt.py) | PySide6 application bootstrap entry point | ✅ Complete |
 
 ---
@@ -97,9 +98,10 @@
 py run_tests.py
 ```
 
-### Test Suites Summary (33 Tests Passing)
+### Test Suites Summary (34 Tests Passing)
 | Test File | Covered Functionality | Result |
 | :--- | :--- | :--- |
+| [`tests/test_core_document.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/tests/test_core_document.py) | Parameter unit conversions (`in`, `mm`, `deg`), DAG recomputation, history undo/redo, Material densities, and mass evaluation | ✅ Passed |
 | [`tests/test_qt_ide_components.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/tests/test_qt_ide_components.py) | PySide6 SolidWorks/Creo QSS tokens, document and CAD agent bindings | ✅ Passed |
 | [`tests/test_ui_theme_and_workspace_settings.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/tests/test_ui_theme_and_workspace_settings.py) | Floating AI Copilot widget lifecycle, Activity Bar navigation, 8 theme palettes, True Black OLED mode, Charcoal grey contrast, theme registration, and workspace settings persistence | ✅ Passed |
 | [`tests/test_v03_ai_copilot_and_advanced_features.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/tests/test_v03_ai_copilot_and_advanced_features.py) | ISO Metric Hole Wizard, Shell hollowing, Cloud Provider fallback, and AI Ghost preview generation | ✅ Passed |
@@ -107,7 +109,6 @@ py run_tests.py
 | [`tests/test_sketch_and_profiles.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/tests/test_sketch_and_profiles.py) | Sketch plane transforms, rectangle/circle 2D profiles, Shoelace area, and loop detection | ✅ Passed |
 | [`tests/test_v02_parametric_features.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/tests/test_v02_parametric_features.py) | Sketch extrusion, multi-solid boolean join on mounting plate, revolution, linear pattern, chamfer, and AI agent sketch-to-extrude flow | ✅ Passed |
 | [`tests/test_geometry_and_backend.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/tests/test_geometry_and_backend.py) | Box creation, mounting plate with holes, tessellation, bounds, volume, and fillet validation | ✅ Passed |
-| [`tests/test_core_document.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/tests/test_core_document.py) | Parameter unit conversions (`in`, `mm`, `deg`), DAG recomputation, and undo/redo history | ✅ Passed |
 | [`tests/test_ai_agent_and_tools.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/tests/test_ai_agent_and_tools.py) | CAD agent natural-language creation, hole additions, filleting, and thickness update | ✅ Passed |
 | [`tests/test_formats_and_serialization.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/tests/test_formats_and_serialization.py) | Save/load `.softwork` document files, STEP AP214 export, and binary STL exports | ✅ Passed |
 
