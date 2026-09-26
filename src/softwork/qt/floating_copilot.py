@@ -144,15 +144,15 @@ class QtFloatingCopilot(QFrame):
         header_layout.addWidget(lbl_title)
 
         prov_name = type(self.agent.provider).__name__.replace("Provider", "")
-        lbl_badge = QLabel(f"[{prov_name}]")
+        lbl_badge = QLabel(prov_name.upper())
         lbl_badge.setObjectName("CopilotBadge")
         header_layout.addWidget(lbl_badge)
 
         header_layout.addStretch()
 
-        self.btn_toggle = QPushButton("[-]" if self.is_expanded else "[+]")
+        self.btn_toggle = QPushButton("Collapse" if self.is_expanded else "Expand")
         self.btn_toggle.setObjectName("ToggleBtn")
-        self.btn_toggle.setFixedSize(22, 18)
+        self.btn_toggle.setFixedSize(58, 20)
         self.btn_toggle.clicked.connect(self.toggle_expanded)
         header_layout.addWidget(self.btn_toggle)
 
@@ -164,8 +164,8 @@ class QtFloatingCopilot(QFrame):
             self.txt_log.setObjectName("CopilotLog")
             self.txt_log.setReadOnly(True)
             self.txt_log.setFixedHeight(110)
-            self.txt_log.append("[SYSTEM] Parametric Copilot Online.")
-            self.txt_log.append("[INFO] Ready for CAD commands, dimension modifications, and feature creation.")
+            self.txt_log.append("SYSTEM: Parametric Copilot Online.")
+            self.txt_log.append("INFO: Ready for CAD commands, dimension modifications, and feature creation.")
             main_layout.addWidget(self.txt_log)
 
             # Quick Prompt Chips
@@ -215,7 +215,7 @@ class QtFloatingCopilot(QFrame):
             return
 
         if hasattr(self, "txt_log") and self.is_expanded:
-            self.txt_log.append(f"\n> {prompt}")
+            self.txt_log.append(f"\nCommand: {prompt}")
 
         # 1. Preview ghost
         plan = self.agent.plan_prompt(prompt)
@@ -226,9 +226,9 @@ class QtFloatingCopilot(QFrame):
         result = self.agent.execute_prompt(prompt)
         if hasattr(self, "txt_log") and self.is_expanded:
             if result.success:
-                self.txt_log.append(f"[OK] {result.explanation}")
+                self.txt_log.append(f"Success: {result.explanation}")
             else:
-                self.txt_log.append(f"[ERROR] {result.error_message}")
+                self.txt_log.append(f"Error: {result.error_message}")
 
         self.promptExecuted.emit(result)
 
