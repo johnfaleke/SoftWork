@@ -7,10 +7,11 @@
 ## 🗺️ Roadmap Reference in `SoftWork.md`
 
 - **v0.1 — Foundation** *(✅ Completed)*: Desktop shell, 3D viewport, CAD backend, document model, primitive solids, STEP/STL export.
-- **v0.2 — Parametric Part Modeling** *(✅ Completed)*: 2D sketches, datum planes (XY/XZ/YZ), closed profiles, extrusions, revolutions, patterns, chamfers, face picking.
-- **v0.3 — AI CAD Copilot** *(In Progress)*: Live cloud LLM providers (Gemini, Claude, OpenAI), visual AI change preview modal, diff inspector.
+- **v0.1 — Foundation** *(✅ Completed)*: Desktop shell, 3D viewport, CAD backend, document model, primitive solids, STEP/STL export.
+- **v0.2 — Parametric Part Modeling** *(✅ Completed)*: 2D sketches, datum planes (XY/XZ/YZ), closed profiles, extrusions, revolutions, patterns, chamfers, face picking, 2D constraint solver, viewport drawing.
+- **v0.3 — AI CAD Copilot & Advanced Features** *(✅ Completed)*: Live cloud LLM providers (Gemini, Claude, OpenAI), visual AI ghost mesh preview & HUD volume delta, ISO Hole Wizard (M3-M16 Counterbore/Countersink), Shell/Hollow feature.
 - **v0.4 — AI-Native Parametric Editing**: Semantic references, design-intent metadata, dependency-aware preservation.
-- **v0.5 — Advanced Part Modeling**: Loft, sweep, shell, draft, advanced pattern topologies.
+- **v0.5 — Advanced Part Modeling**: Loft, sweep, draft, advanced pattern topologies.
 - **v0.6 — Assemblies**: Components, mates, interference detection, BOM.
 - **v0.7 — Drawings**: Orthographic views, dimensions, annotations, PDF/DXF export.
 - **v0.8 — AI Engineering Agent**: Multi-step design plans, multimodal inputs, design alternatives, manufacturing awareness.
@@ -31,12 +32,14 @@
 | [`sketch/solver.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/sketch/solver.py) | Gauss-Newton / Levenberg-Marquardt numerical constraint solver with DOF estimation | ✅ Complete |
 | [`sketch/sketch.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/sketch/sketch.py) | 2D Sketch container managing plane, elements, constraints, and profiles | ✅ Complete |
 
-### 2. Parametric Features (`softwork.core.feature`) — *v0.1 & v0.2*
+### 2. Parametric Features (`softwork.core.feature`) — *v0.1, v0.2 & v0.3*
 | Feature Class | Description | Status |
 | :--- | :--- | :--- |
 | `SketchFeature` | First-class 2D sketch entity in the feature tree | ✅ Complete |
 | `ExtrudeFeature` | Extrudes 2D sketch profile by parametric `distance` | ✅ Complete |
 | `RevolveFeature` | Revolves 2D sketch profile around axis by parametric `angle` | ✅ Complete |
+| `HoleWizardFeature` | Standard ISO metric holes (M3 to M16) with simple, counterbore, and countersink geometry | ✅ Complete |
+| `ShellFeature` | Uniform wall thickness shelling & hollow cavity generation | ✅ Complete |
 | `PatternFeature` | Linear array repetition of 3D solid features | ✅ Complete |
 | `ChamferFeature` | Edge chamfering with parametric `distance` | ✅ Complete |
 | `MountingPlateFeature` | Multi-hole parametric mounting plate with corner fillets | ✅ Complete |
@@ -49,7 +52,7 @@
 | [`cad/geometry.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/cad/geometry.py) | 3D points, vectors, bounding boxes, and triangulated `MeshData` | ✅ Complete |
 | [`cad/topology.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/cad/topology.py) | Topology entity structures and `CADShape` representation | ✅ Complete |
 | [`cad/backend.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/cad/backend.py) | Abstract geometric kernel interface (`CADBackend`) | ✅ Complete |
-| [`cad/direct_backend.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/cad/direct_backend.py) | Solid kernel with CSG, profile extrusions, revolutions, and tessellation | ✅ Complete |
+| [`cad/direct_backend.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/cad/direct_backend.py) | Solid kernel with CSG, hole tools, shell cavities, profile extrusions, revolutions, and tessellation | ✅ Complete |
 | [`cad/cadquery_backend.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/cad/cadquery_backend.py) | OpenCASCADE & CadQuery adapter with automatic fallback | ✅ Complete |
 | [`cad/validation.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/cad/validation.py) | `GeometryValidator` (volume, manifold, and boundary checks) | ✅ Complete |
 
@@ -57,22 +60,22 @@
 | Module / File | Description | Status |
 | :--- | :--- | :--- |
 | [`commands/base.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/commands/base.py) | Abstract `Command` interface | ✅ Complete |
-| [`commands/feature_commands.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/commands/feature_commands.py) | `CreateSketchCommand`, `ExtrudeSketchCommand`, `RevolveSketchCommand`, `AddPatternCommand`, `AddChamferCommand`, `CreateBoxCommand`, `CreateMountingPlateCommand`, `AddFilletCommand` | ✅ Complete |
+| [`commands/feature_commands.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/commands/feature_commands.py) | `CreateSketchCommand`, `ExtrudeSketchCommand`, `RevolveSketchCommand`, `AddHoleWizardCommand`, `AddShellCommand`, `AddPatternCommand`, `AddChamferCommand`, `CreateBoxCommand`, `CreateMountingPlateCommand`, `AddFilletCommand` | ✅ Complete |
 | [`commands/parameter_commands.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/commands/parameter_commands.py) | `SetParameterCommand` with cascading dependency recalculation | ✅ Complete |
 
-### 5. AI Subsystem (`softwork.ai`)
+### 5. AI Subsystem (`softwork.ai`) — *v0.3*
 | Module / File | Description | Status |
 | :--- | :--- | :--- |
-| [`ai/provider.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/ai/provider.py) | Heuristic engine recognizing sketch creation, rectangle/circle profiles, extrusions, revolutions, patterns, and chamfers | ✅ Complete |
-| [`ai/tools.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/ai/tools.py) | Strict typed tool registry (`sketch.create`, `sketch.add_rectangle`, `sketch.add_circle`, `feature.extrude`, `feature.revolve`, `feature.pattern`, `feature.chamfer`, `parameter.set`) | ✅ Complete |
+| [`ai/provider.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/ai/provider.py) | Cloud LLM providers (`GeminiProvider`, `OpenAIProvider`, `AnthropicProvider`) and deterministic Heuristic engine | ✅ Complete |
+| [`ai/tools.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/ai/tools.py) | Strict typed tool registry (`sketch.create`, `sketch.add_rectangle`, `sketch.add_circle`, `feature.extrude`, `feature.revolve`, `feature.hole_wizard`, `feature.shell`, `feature.pattern`, `feature.chamfer`, `parameter.set`) | ✅ Complete |
 | [`ai/context.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/ai/context.py) | Selection & dependency-aware compressed context builder | ✅ Complete |
-| [`ai/agent.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/ai/agent.py) | `CADAgent` (Understand → Plan → Operate → Validate → Explain) | ✅ Complete |
+| [`ai/agent.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/ai/agent.py) | `CADAgent` (Understand → Plan with Ghost Simulation → Operate → Validate → Explain) | ✅ Complete |
 
-### 6. Desktop User Interface (`softwork.ui`)
+### 6. Desktop User Interface (`softwork.ui`) — *v0.3*
 | Module / File | Description | Status |
 | :--- | :--- | :--- |
-| [`ui/viewport.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/ui/viewport.py) | 3D Canvas with Orbit, Pan, Zoom, Lighting, **Interactive Click-and-Drag 2D Drawing** (Rect, Circle, Line), **Real-Time Dimension Labels**, and **Face Picking** | ✅ Complete |
-| [`ui/main_window.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/ui/main_window.py) | Tool Switcher (`Select`, `Rect`, `Circle`, `Line`), Constraint Inspector & Solver button, Menubar, Design Toolbar, Tree, Properties, AI Bar | ✅ Complete |
+| [`ui/viewport.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/ui/viewport.py) | 3D Canvas with **AI Ghost Preview Mesh Overlay**, **Floating HUD Volume Delta Badge**, **Interactive 2D Sketch Drawing**, and **3D Face Picking** | ✅ Complete |
+| [`ui/main_window.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/ui/main_window.py) | Cloud AI API Key Setup Modal, Design Toolbar (`Hole`, `Shell`, `Sketch`, `Extrude`, `Revolve`), Tree, Properties, AI Bar | ✅ Complete |
 | [`app/main.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/app/main.py) | Application bootstrap and CLI entry point | ✅ Complete |
 
 ---
@@ -84,9 +87,10 @@
 py run_tests.py
 ```
 
-### Test Suites Summary (20 Tests)
+### Test Suites Summary (25 Tests)
 | Test File | Covered Functionality | Result |
 | :--- | :--- | :--- |
+| [`tests/test_v03_ai_copilot_and_advanced_features.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/tests/test_v03_ai_copilot_and_advanced_features.py) | ISO Metric Hole Wizard, Shell hollowing, Cloud Provider fallback, and AI Ghost preview generation | ✅ Passed |
 | [`tests/test_constraint_solver.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/tests/test_constraint_solver.py) | 2D Geometric constraint solver: Coincident, Fixed, Horizontal, Vertical, Radius, and DOF diagnostics | ✅ Passed |
 | [`tests/test_sketch_and_profiles.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/tests/test_sketch_and_profiles.py) | Sketch plane transforms, rectangle/circle 2D profiles, Shoelace area, and loop detection | ✅ Passed |
 | [`tests/test_v02_parametric_features.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/tests/test_v02_parametric_features.py) | Sketch extrusion, multi-solid boolean join on mounting plate, revolution, linear pattern, chamfer, and AI agent sketch-to-extrude flow | ✅ Passed |
@@ -95,28 +99,18 @@ py run_tests.py
 | [`tests/test_ai_agent_and_tools.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/tests/test_ai_agent_and_tools.py) | CAD agent natural-language creation, hole additions, filleting, and thickness update | ✅ Passed |
 | [`tests/test_formats_and_serialization.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/tests/test_formats_and_serialization.py) | Save/load `.softwork` document files, STEP AP214 export, and binary STL exports | ✅ Passed |
 
-**Result:** 20 tests ran in 0.160s — **100% OK**.
+**Result:** 25 tests ran in 0.492s — **100% OK**.
 
 ---
 
 ## 🚀 How to Run SoftWork
 
-### 1. Launch the Desktop GUI (v0.2+)
+### 1. Launch the Desktop GUI (v0.3)
 ```bash
 py src/softwork/app/main.py
 ```
-- **Interactive Viewport Drawing:** Click `▭ Rect`, `⭕ Circle`, or `╱ Line` on the toolbar, then click & drag directly on the 3D viewport canvas. Real-time rubber-band bounding box and live dimension labels appear as you drag.
+- **Visual AI Ghost Preview:** When querying the AI Copilot, a semi-transparent dashed amber preview of the proposed shape and a floating `Δ Vol` HUD badge appears before applying changes.
+- **Cloud LLM Configuration:** Click **AI -> ⚙️ Configure Cloud AI Keys...** to connect Google Gemini (1.5 Pro), OpenAI (GPT-4o), or Anthropic (Claude 3.5 Sonnet).
+- **ISO Metric Hole Wizard & Shelling:** Add M3..M16 standard counterbore holes or shell solid bodies with 1-click toolbar buttons or AI prompts.
+- **Interactive Viewport Drawing:** Click `▭ Rect`, `⭕ Circle`, or `╱ Line` on the toolbar, then click & drag directly on the 3D viewport canvas.
 - **2D Geometric Constraint Solver:** In the Properties panel for any sketch, inspect degrees of freedom (DOF) and click `📐 Solve Constraints (DOF)` to resolve geometric constraints.
-- **Extrude on Mounting Plate:** Extrusions created on top of base plates automatically boolean-join and recalculate composite solid volume.
-- **3D Face Picking:** Click on any surface in the 3D viewport to highlight it in gold and view normal/index in the status bar.
-- **Revolve & Pattern:** Revolve profiles into solids or duplicate features into array patterns.
-
----
-
-## 📅 Next Development Tasks (v0.3 AI Copilot)
-
-- [ ] **Task 3.1: Live Cloud LLM Provider Integration**
-  - Connect `GeminiProvider`, `AnthropicProvider`, and `OpenAIProvider` with streaming function calling.
-  - Add API key configuration dialog in the GUI.
-- [ ] **Task 3.2: Visual AI Change Preview & Ghost Overlay**
-  - Display before/after diff summary and volume delta before committing AI changes.
