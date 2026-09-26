@@ -1,234 +1,271 @@
 """
-Modern QSS Stylesheets and Design Tokens for SoftWork PySide6 / Qt6 CAD IDE.
+Professional CAD QSS Stylesheets and Design Tokens for SoftWork (PTC Creo & SolidWorks aesthetic).
 """
 from __future__ import annotations
 
 
 DARK_IDE_STYLE = """
-/* Global Reset & Base */
+/* Global Reset & Base (SolidWorks Dark / PTC Creo Dark Slate) */
 QWidget {
-    background-color: #0A0A0A;
-    color: #FFFFFF;
-    font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, "Roboto", sans-serif;
-    font-size: 13px;
-    selection-background-color: #00F0FF;
-    selection-color: #000000;
+    background-color: #1E2227;
+    color: #DCE1E8;
+    font-family: "Segoe UI", "Segoe UI Variable", -apple-system, BlinkMacSystemFont, "Tahoma", sans-serif;
+    font-size: 12px;
+    selection-background-color: #007ACC;
+    selection-color: #FFFFFF;
 }
 
 /* Main Window & Central Container */
 QMainWindow {
-    background-color: #000000;
+    background-color: #181A1F;
 }
 
 /* Menubar */
 QMenuBar {
-    background-color: #0C0C0C;
-    color: #E2E8F0;
-    border-bottom: 1px solid #1E1E1E;
-    padding: 2px 6px;
+    background-color: #21252B;
+    color: #DCE1E8;
+    border-bottom: 1px solid #2C313A;
+    padding: 1px 4px;
+    font-size: 12px;
 }
 QMenuBar::item {
     background: transparent;
     padding: 4px 8px;
-    border-radius: 4px;
+    border-radius: 2px;
 }
 QMenuBar::item:selected {
-    background-color: #1F1F1F;
-    color: #00F0FF;
+    background-color: #2C313A;
+    color: #00A8FF;
 }
 QMenu {
-    background-color: #121212;
-    color: #FFFFFF;
-    border: 1px solid #282828;
-    border-radius: 6px;
-    padding: 4px 0px;
+    background-color: #21252B;
+    color: #DCE1E8;
+    border: 1px solid #3E4451;
+    border-radius: 2px;
+    padding: 3px 0px;
 }
 QMenu::item {
-    padding: 6px 24px 6px 12px;
+    padding: 5px 24px 5px 12px;
 }
 QMenu::item:selected {
-    background-color: #00F0FF;
-    color: #000000;
-    font-weight: bold;
+    background-color: #007ACC;
+    color: #FFFFFF;
 }
 QMenu::separator {
     height: 1px;
-    background-color: #242424;
-    margin: 4px 8px;
+    background-color: #2C313A;
+    margin: 3px 6px;
 }
 
-/* Toolbars & Ribbon */
+/* Ribbon Tab Bar & CommandManager */
+QTabWidget::pane {
+    border: 1px solid #2C313A;
+    background-color: #21252B;
+    top: -1px;
+}
+QTabBar::tab {
+    background-color: #1E2227;
+    color: #9DA5B4;
+    border: 1px solid #2C313A;
+    border-bottom: none;
+    padding: 6px 14px;
+    margin-right: 2px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+QTabBar::tab:selected {
+    background-color: #21252B;
+    color: #00A8FF;
+    border-top: 2px solid #00A8FF;
+    border-bottom: 1px solid #21252B;
+}
+QTabBar::tab:hover:!selected {
+    background-color: #282C34;
+    color: #DCE1E8;
+}
+
+/* CAD Toolbars & Ribbon Panels */
 QToolBar {
-    background-color: #0C0C0C;
-    border-bottom: 1px solid #1E1E1E;
-    spacing: 6px;
-    padding: 4px 8px;
+    background-color: #21252B;
+    border-bottom: 1px solid #2C313A;
+    spacing: 4px;
+    padding: 3px 6px;
 }
 QToolButton {
-    background-color: #181818;
-    color: #F1F5F9;
-    border: 1px solid #282828;
-    border-radius: 6px;
-    padding: 5px 10px;
-    font-size: 12px;
+    background-color: #282C34;
+    color: #DCE1E8;
+    border: 1px solid #3E4451;
+    border-radius: 3px;
+    padding: 4px 8px;
+    font-size: 11px;
     font-weight: 500;
 }
 QToolButton:hover {
-    background-color: #242424;
-    border-color: #00F0FF;
-    color: #00F0FF;
+    background-color: #353B45;
+    border-color: #00A8FF;
+    color: #00A8FF;
 }
 QToolButton:pressed {
-    background-color: #00F0FF;
-    color: #000000;
+    background-color: #007ACC;
+    border-color: #007ACC;
+    color: #FFFFFF;
+}
+QToolButton:checked {
+    background-color: #007ACC;
+    border-color: #00A8FF;
+    color: #FFFFFF;
 }
 
 /* Push Buttons */
 QPushButton {
-    background-color: #181818;
-    color: #FFFFFF;
-    border: 1px solid #2A2A2A;
-    border-radius: 6px;
-    padding: 6px 14px;
-    font-size: 12px;
+    background-color: #282C34;
+    color: #DCE1E8;
+    border: 1px solid #3E4451;
+    border-radius: 3px;
+    padding: 5px 12px;
+    font-size: 11px;
     font-weight: 500;
 }
 QPushButton:hover {
-    background-color: #262626;
-    border-color: #00F0FF;
-    color: #00F0FF;
+    background-color: #353B45;
+    border-color: #00A8FF;
+    color: #00A8FF;
 }
 QPushButton:pressed {
-    background-color: #00F0FF;
-    color: #000000;
-    font-weight: bold;
+    background-color: #007ACC;
+    color: #FFFFFF;
 }
-QPushButton#AccentButton {
-    background-color: #00F0FF;
-    color: #000000;
-    border: none;
-    font-weight: bold;
+QPushButton#PrimaryButton {
+    background-color: #007ACC;
+    color: #FFFFFF;
+    border: 1px solid #00A8FF;
+    font-weight: 600;
 }
-QPushButton#AccentButton:hover {
-    background-color: #33F3FF;
+QPushButton#PrimaryButton:hover {
+    background-color: #0088DD;
 }
-QPushButton#AccentButton:pressed {
-    background-color: #00B8C4;
+QPushButton#PrimaryButton:pressed {
+    background-color: #0060A0;
 }
 
 /* Input Fields & Textboxes */
 QLineEdit, QTextEdit, QPlainTextEdit {
-    background-color: #141414;
-    color: #FFFFFF;
-    border: 1px solid #262626;
-    border-radius: 6px;
-    padding: 6px 8px;
-    font-size: 12px;
+    background-color: #181A1F;
+    color: #DCE1E8;
+    border: 1px solid #3E4451;
+    border-radius: 2px;
+    padding: 4px 6px;
+    font-size: 11px;
 }
 QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus {
-    border: 1px solid #00F0FF;
-    background-color: #181818;
+    border: 1px solid #00A8FF;
+    background-color: #1E2227;
 }
 
-/* Tree & List Views (Model Tree) */
+/* FeatureManager Design Tree (Model Tree) */
 QTreeWidget, QTreeView, QListWidget {
-    background-color: #0E0E0E;
-    color: #F8FAFC;
-    border: 1px solid #1F1F1F;
-    border-radius: 6px;
+    background-color: #1E2227;
+    color: #DCE1E8;
+    border: 1px solid #2C313A;
+    border-radius: 2px;
     outline: none;
-    padding: 4px;
+    padding: 2px;
+    font-size: 11px;
 }
 QTreeWidget::item {
-    height: 28px;
-    border-radius: 4px;
-    padding-left: 4px;
+    height: 24px;
+    border-radius: 2px;
+    padding-left: 2px;
 }
 QTreeWidget::item:hover {
-    background-color: #1A1A1A;
-    color: #00F0FF;
+    background-color: #282C34;
+    color: #00A8FF;
 }
 QTreeWidget::item:selected {
-    background-color: #00F0FF;
-    color: #000000;
-    font-weight: bold;
+    background-color: #007ACC;
+    color: #FFFFFF;
+    font-weight: 600;
 }
 QHeaderView::section {
-    background-color: #121212;
-    color: #A1A1AA;
+    background-color: #21252B;
+    color: #8B949E;
     border: none;
-    border-bottom: 1px solid #222222;
-    padding: 4px 8px;
-    font-size: 11px;
-    font-weight: bold;
+    border-bottom: 1px solid #2C313A;
+    padding: 3px 6px;
+    font-size: 10px;
+    font-weight: 600;
     text-transform: uppercase;
 }
 
 /* Dock Widgets & Panels */
 QDockWidget {
-    color: #00F0FF;
-    font-weight: bold;
+    color: #DCE1E8;
+    font-weight: 600;
     titlebar-close-icon: url(none);
     titlebar-normal-icon: url(none);
 }
 QDockWidget::title {
-    background-color: #121212;
-    border-bottom: 1px solid #1E1E1E;
-    padding: 6px 10px;
-    font-size: 11px;
-    font-weight: bold;
+    background-color: #21252B;
+    border-bottom: 1px solid #2C313A;
+    padding: 5px 8px;
+    font-size: 10px;
+    font-weight: 600;
     text-transform: uppercase;
-    color: #A1A1AA;
+    color: #8B949E;
 }
 
-/* Scrollbars */
+/* Scrollbars (Compact CAD style) */
 QScrollBar:vertical {
-    background: #0C0C0C;
+    background: #181A1F;
     width: 8px;
     margin: 0px;
 }
 QScrollBar::handle:vertical {
-    background: #282828;
+    background: #3E4451;
     min-height: 20px;
-    border-radius: 4px;
+    border-radius: 2px;
 }
 QScrollBar::handle:vertical:hover {
-    background: #00F0FF;
+    background: #00A8FF;
 }
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
     height: 0px;
 }
 QScrollBar:horizontal {
-    background: #0C0C0C;
+    background: #181A1F;
     height: 8px;
     margin: 0px;
 }
 QScrollBar::handle:horizontal {
-    background: #282828;
+    background: #3E4451;
     min-width: 20px;
-    border-radius: 4px;
+    border-radius: 2px;
 }
 QScrollBar::handle:horizontal:hover {
-    background: #00F0FF;
+    background: #00A8FF;
 }
 QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
     width: 0px;
 }
 
-/* Status Bar */
+/* Status Bar (SolidWorks / Creo standard) */
 QStatusBar {
-    background-color: #0C0C0C;
-    color: #94A3B8;
-    border-top: 1px solid #1E1E1E;
+    background-color: #21252B;
+    color: #8B949E;
+    border-top: 1px solid #2C313A;
     font-size: 11px;
-    padding: 2px 8px;
+    padding: 2px 6px;
 }
 
 /* Splitters */
 QSplitter::handle {
-    background-color: #161616;
+    background-color: #2C313A;
 }
 QSplitter::handle:hover {
-    background-color: #00F0FF;
+    background-color: #00A8FF;
 }
 """
+
+# Alias for backward-compatibility with test suite
+DARK_THEME_STYLE = DARK_IDE_STYLE
