@@ -55,8 +55,10 @@ class CAD3DCanvas(tk.Canvas):
         self._is_panning: bool = False
         self._drag_dist: float = 0.0
 
-        # Current mesh and sketches to render
+        # Current mesh, ghost preview mesh, and sketches to render
         self._mesh: Optional[MeshData] = None
+        self._ghost_mesh: Optional[MeshData] = None
+        self._ghost_delta_vol: float = 0.0
         self._sketches: List[Any] = []
         self._solid_color: str = "#38BDF8"  # Precision CAD cyan/blue
         self.selected_face_idx: Optional[int] = None
@@ -83,6 +85,14 @@ class CAD3DCanvas(tk.Canvas):
         self._mesh = mesh
         self._solid_color = color
         self.selected_face_idx = None
+        self._ghost_mesh = None
+        self._ghost_delta_vol = 0.0
+        self.render()
+
+    def set_ghost_mesh(self, ghost_mesh: Optional[MeshData], delta_vol: float = 0.0) -> None:
+        self._ghost_mesh = ghost_mesh
+        self._ghost_delta_vol = delta_vol
+        self.render()
         self.render()
 
     def set_sketches(self, sketches: List[Any]) -> None:
@@ -382,6 +392,31 @@ class CAD3DCanvas(tk.Canvas):
                     v0 = projected_verts[edge[0]]
                     v1 = projected_verts[edge[1]]
                     self.create_line(v0[0], v0[1], v1[0], v1[1], fill="#38BDF8", width=1.5)
+
+        # 2.5 Render AI Ghost Preview Overlay
+        if self._ghost_mesh and self._ghost_mesh.vertices:
+            ghost_proj: List[Tuple[float, float, float]] = []
+            for gv in self._ghost_mesh.vertices:
+                ghost_proj.append(self._project_point(gv[0], gv[1], gv[2], cx, cy, rad_x, rad_y))
+
+            if self._ghost_mesh.faces:
+                for f in self._ghost_mesh.faces:
+                    gv0, gv1, gv2 = ghost_proj[f[0]], ghost_proj[f[1]], ghost_proj[f[2]]
+                    self.create_polygon(
+                        gv0[0], gv0[1], gv1[0], gv1[1], gv2[0], gv2[1],
+                        fill="",
+                        outline="#F59E0B",
+                        width=1,
+                        dash=(4, 2),
+                    )
+
+            # Floating AI Ghost HUD badge in viewport top-right
+            badge_x = w - 180
+            badge_y = 20
+            self.create_rectangle(badge_x, badge_y, badge_x + 160, badge_y + 36, fill="#1E293B", outline="#F59E0B", width=2)
+            vol_str = f"{'+' if self._ghost_delta_vol >= 0 else ''}{self._ghost_delta_vol:,.0f} mm³"
+            self.create_text(badge_x + 80, badge_y + 12, text="✨ AI Proposed Shape", fill="#FBBF24", font=("Segoe UI", 8, "bold"))
+            self.create_text(badge_x + 80, badge_y + 26, text=f"Δ Vol: {vol_str}", fill="#38BDF8", font=("Segoe UI", 8))
 
         # 3. Render 2D Sketches in 3D Space
         for sketch in self._sketches:
