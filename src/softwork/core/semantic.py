@@ -44,22 +44,20 @@ class SemanticReference:
         """
         Calculates confidence score [0.0, 1.0] for matching this semantic reference to a face.
         """
-        # Normal vector dot product alignment
         dot = (
             self.normal_hint[0] * normal[0] +
             self.normal_hint[1] * normal[1] +
             self.normal_hint[2] * normal[2]
         )
-        if dot < 0.7:
+        if dot < 0.3 and abs(self.normal_hint[2] - normal[2]) > 0.5:
             return 0.0
 
-        # Centroid proximity
         dist = math.sqrt(
             (self.centroid_hint[0] - centroid[0]) ** 2 +
             (self.centroid_hint[1] - centroid[1]) ** 2 +
             (self.centroid_hint[2] - centroid[2]) ** 2
         )
-        score = max(0.0, 1.0 - (dist / 200.0)) * max(0.0, dot)
+        score = max(0.0, 1.0 - (dist / 200.0))
         return score
 
 
@@ -78,7 +76,6 @@ class SemanticTopologyMatcher:
 
         refs: List[SemanticReference] = []
 
-        # Find bounds
         xs = [v[0] for v in mesh.vertices]
         ys = [v[1] for v in mesh.vertices]
         zs = [v[2] for v in mesh.vertices]
@@ -108,22 +105,22 @@ class SemanticTopologyMatcher:
             cz = (v0[2] + v1[2] + v2[2]) / 3.0
 
             # Determine role
-            if norm[2] > 0.9 and abs(cz - max_z) < 1.0:
+            if (norm[2] > 0.4 or abs(cz - max_z) < 1e-3) and cz > (min_z + 0.1):
                 role = SemanticRole.TOP_FACE
                 tag = f"{feature_id}:face:top_{idx}"
-            elif norm[2] < -0.9 and abs(cz - min_z) < 1.0:
+            elif (norm[2] < -0.4 or abs(cz - min_z) < 1e-3) and cz < (max_z - 0.1):
                 role = SemanticRole.BOTTOM_FACE
                 tag = f"{feature_id}:face:bottom_{idx}"
-            elif norm[1] > 0.9:
+            elif norm[1] > 0.5:
                 role = SemanticRole.BACK_FACE
                 tag = f"{feature_id}:face:back_{idx}"
-            elif norm[1] < -0.9:
+            elif norm[1] < -0.5:
                 role = SemanticRole.FRONT_FACE
                 tag = f"{feature_id}:face:front_{idx}"
-            elif norm[0] < -0.9:
+            elif norm[0] < -0.5:
                 role = SemanticRole.LEFT_FACE
                 tag = f"{feature_id}:face:left_{idx}"
-            elif norm[0] > 0.9:
+            elif norm[0] > 0.5:
                 role = SemanticRole.RIGHT_FACE
                 tag = f"{feature_id}:face:right_{idx}"
             else:

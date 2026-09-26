@@ -56,7 +56,7 @@ class ParametricModifier:
                         hole_offset=feat.parameters["hole_offset"].value,
                         fillet_radius=feat.parameters["fillet_radius"].value,
                     )
-                    ghost_solid = document.backend.create_mounting_plate(
+                    ghost_solid = document.backend.create_plate_with_holes(
                         ghost_plate.parameters["length"].value,
                         ghost_plate.parameters["width"].value,
                         new_val,
@@ -67,6 +67,7 @@ class ParametricModifier:
                     ghost_mesh = document.backend.to_mesh(ghost_solid)
                     cur_vol = document.active_part.active_solid.volume if document.active_part.active_solid else 0.0
                     return AgentPlan(
+                        prompt=prompt,
                         intent=f"Modify {feat.name}.thickness to {new_val} mm",
                         target_feature_id=feat.id,
                         predicted_tool_calls=[{"tool": "parameter.set", "feature_id": feat.id, "param": "thickness", "value": new_val}],
@@ -75,6 +76,7 @@ class ParametricModifier:
                     )
                 elif isinstance(feat, ExtrudeFeature) and "distance" in feat.parameters:
                     return AgentPlan(
+                        prompt=prompt,
                         intent=f"Modify {feat.name}.distance to {new_val} mm",
                         target_feature_id=feat.id,
                         predicted_tool_calls=[{"tool": "parameter.set", "feature_id": feat.id, "param": "distance", "value": new_val}],
@@ -89,6 +91,7 @@ class ParametricModifier:
             for feat in reversed(features):
                 if isinstance(feat, HoleWizardFeature):
                     return AgentPlan(
+                        prompt=prompt,
                         intent=f"Modify {feat.name}.metric_size to {new_size}",
                         target_feature_id=feat.id,
                         predicted_tool_calls=[{"tool": "parameter.set", "feature_id": feat.id, "param": "metric_size", "value": new_size}],
@@ -99,6 +102,7 @@ class ParametricModifier:
                     d_map = {"M3": 3.4, "M4": 4.5, "M5": 5.5, "M6": 6.6, "M8": 9.0, "M10": 11.0, "M12": 13.5}
                     new_d = d_map.get(new_size, 9.0)
                     return AgentPlan(
+                        prompt=prompt,
                         intent=f"Modify {feat.name}.hole_diameter to {new_d} mm ({new_size})",
                         target_feature_id=feat.id,
                         predicted_tool_calls=[{"tool": "parameter.set", "feature_id": feat.id, "param": "hole_diameter", "value": new_d}],
@@ -113,6 +117,7 @@ class ParametricModifier:
             for feat in reversed(features):
                 if isinstance(feat, FilletFeature) and "radius" in feat.parameters:
                     return AgentPlan(
+                        prompt=prompt,
                         intent=f"Modify {feat.name}.radius to {new_r} mm",
                         target_feature_id=feat.id,
                         predicted_tool_calls=[{"tool": "parameter.set", "feature_id": feat.id, "param": "radius", "value": new_r}],
@@ -120,6 +125,7 @@ class ParametricModifier:
                     )
                 elif isinstance(feat, MountingPlateFeature) and "fillet_radius" in feat.parameters:
                     return AgentPlan(
+                        prompt=prompt,
                         intent=f"Modify {feat.name}.fillet_radius to {new_r} mm",
                         target_feature_id=feat.id,
                         predicted_tool_calls=[{"tool": "parameter.set", "feature_id": feat.id, "param": "fillet_radius", "value": new_r}],
@@ -139,6 +145,7 @@ class ParametricModifier:
                         mods.append((feat.id, "length", float(m_l.group(1)), "mm"))
                     if mods:
                         return AgentPlan(
+                            prompt=prompt,
                             intent=f"Batch modify {feat.name} dimensions",
                             target_feature_id=feat.id,
                             predicted_tool_calls=[{"tool": "parameter.batch_set", "modifications": mods}],
@@ -165,6 +172,7 @@ class ParametricModifier:
                 if isinstance(feat, MountingPlateFeature) and "thickness" in feat.parameters:
                     SetParameterCommand(feat.id, "thickness", new_val).execute(document)
                     return AgentExecutionResult(
+                        prompt=prompt,
                         success=True,
                         created_feature_id=feat.id,
                         explanation=f"Updated {feat.name}.thickness to {new_val} mm in parametric history.",
@@ -172,6 +180,7 @@ class ParametricModifier:
                 elif isinstance(feat, ExtrudeFeature) and "distance" in feat.parameters:
                     SetParameterCommand(feat.id, "distance", new_val).execute(document)
                     return AgentExecutionResult(
+                        prompt=prompt,
                         success=True,
                         created_feature_id=feat.id,
                         explanation=f"Updated {feat.name}.distance to {new_val} mm in parametric history.",
@@ -185,6 +194,7 @@ class ParametricModifier:
                 if isinstance(feat, HoleWizardFeature):
                     SetParameterCommand(feat.id, "metric_size", new_size).execute(document)
                     return AgentExecutionResult(
+                        prompt=prompt,
                         success=True,
                         created_feature_id=feat.id,
                         explanation=f"Updated {feat.name} to standard {new_size} holes.",
@@ -194,6 +204,7 @@ class ParametricModifier:
                     new_d = d_map.get(new_size, 9.0)
                     SetParameterCommand(feat.id, "hole_diameter", new_d).execute(document)
                     return AgentExecutionResult(
+                        prompt=prompt,
                         success=True,
                         created_feature_id=feat.id,
                         explanation=f"Updated {feat.name}.hole_diameter to {new_d} mm ({new_size}).",
@@ -207,6 +218,7 @@ class ParametricModifier:
                 if isinstance(feat, FilletFeature) and "radius" in feat.parameters:
                     SetParameterCommand(feat.id, "radius", new_r).execute(document)
                     return AgentExecutionResult(
+                        prompt=prompt,
                         success=True,
                         created_feature_id=feat.id,
                         explanation=f"Updated {feat.name}.radius to {new_r} mm.",
@@ -214,6 +226,7 @@ class ParametricModifier:
                 elif isinstance(feat, MountingPlateFeature) and "fillet_radius" in feat.parameters:
                     SetParameterCommand(feat.id, "fillet_radius", new_r).execute(document)
                     return AgentExecutionResult(
+                        prompt=prompt,
                         success=True,
                         created_feature_id=feat.id,
                         explanation=f"Updated {feat.name}.fillet_radius to {new_r} mm.",
@@ -233,6 +246,7 @@ class ParametricModifier:
                     if mods:
                         BatchSetParameterCommand(mods, title=f"Resize {feat.name}").execute(document)
                         return AgentExecutionResult(
+                            prompt=prompt,
                             success=True,
                             created_feature_id=feat.id,
                             explanation=f"Batch updated {feat.name} dimensions in a single atomic transaction.",
@@ -246,6 +260,7 @@ class ParametricModifier:
                 if isinstance(feat, ShellFeature) and "wall_thickness" in feat.parameters:
                     SetParameterCommand(feat.id, "wall_thickness", new_wall).execute(document)
                     return AgentExecutionResult(
+                        prompt=prompt,
                         success=True,
                         created_feature_id=feat.id,
                         explanation=f"Updated {feat.name}.wall_thickness to {new_wall} mm.",
