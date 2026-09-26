@@ -55,6 +55,7 @@ class Feature(ABC):
     provenance: str = "user"  # "user", "ai", "script"
     is_suppressed: bool = False
     generated_shape: Optional[CADShape] = None
+    previous_valid_shape: Optional[CADShape] = None
 
     def get_parameter(self, param_name: str) -> Parameter:
         if param_name not in self.parameters:

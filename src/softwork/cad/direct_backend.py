@@ -7,21 +7,38 @@ import math
 import uuid
 from typing import Optional, List, Tuple, Dict, Any
 
-from softwork.cad.backend import CADBackend
+import warnings
+from softwork.cad.backend import CADBackend, CADKernelError
+from softwork.cad.capabilities import BackendCapabilities
 from softwork.cad.geometry import MeshData, BoundingBox, Point3D, Vector3D
 from softwork.cad.topology import CADShape
 from softwork.sketch.profile import SketchProfile
 from softwork.sketch.plane import SketchPlane, StandardPlane
 
 
-class DirectGeometryBackend(CADBackend):
+class PrototypeGeometryBackend(CADBackend):
     """
-    Standard geometric CAD backend.
-    Ensures deterministic parametric modeling, sketch extrusions, and viewport rendering.
+    NON-PRODUCTION PROTOTYPE: Pure-Python polyhedral geometric backend.
+    Used strictly for lightweight testing and development.
+    Does NOT produce true B-rep geometry and cannot perform STEP export.
     """
 
+    def __init__(self) -> None:
+        pass
+
+    @property
+    def capabilities(self) -> BackendCapabilities:
+        return BackendCapabilities(
+            name="PrototypeGeometryBackend",
+            is_available=True,
+            is_authoritative_brep=False,
+            supports_step=False,
+            supports_stl=True,
+            diagnostic_message="NON-PRODUCTION PROTOTYPE: Pure-Python polyhedral mesh generator. Not suitable for B-rep modeling or STEP export.",
+        )
+
     def name(self) -> str:
-        return "DirectGeometryBackend"
+        return "PrototypeGeometryBackend"
 
     def create_box(self, width: float, height: float, depth: float, center: bool = True) -> CADShape:
         if width <= 0 or height <= 0 or depth <= 0:
@@ -560,10 +577,17 @@ class DirectGeometryBackend(CADBackend):
         return MeshData()
 
     def export_step(self, shape: CADShape, filepath: str) -> bool:
-        from softwork.formats.step import write_step_file
-        return write_step_file(shape, filepath)
+        raise CADKernelError(
+            "EXPORT_UNSUPPORTED: PrototypeGeometryBackend cannot export STEP; "
+            "an authoritative OpenCASCADE/CadQuery B-rep solid is required."
+        )
 
     def export_stl(self, shape: CADShape, filepath: str, binary: bool = True) -> bool:
         from softwork.formats.stl import write_stl_file
         mesh = self.to_mesh(shape)
         return write_stl_file(mesh, filepath, binary=binary)
+
+
+# Backward-compatible alias for existing test fixtures
+DirectGeometryBackend = PrototypeGeometryBackend
+

@@ -13,11 +13,12 @@ from softwork.commands.feature_commands import (
 )
 from softwork.commands.parameter_commands import SetParameterCommand
 from softwork.ai.agent import CADAgent
+from tests.test_helpers import create_test_document
 
 
 class TestV02ParametricFeatures(unittest.TestCase):
     def test_sketch_extrude_workflow(self):
-        doc = Document(name="ExtrudeTest")
+        doc = create_test_document(name="ExtrudeTest")
         # 1. Create sketch with 100x60 rectangle
         sk_feat = SketchFeature(name="Sketch_XY")
         sk_feat.sketch.add_rectangle(100.0, 60.0, centered=True)
@@ -35,7 +36,7 @@ class TestV02ParametricFeatures(unittest.TestCase):
         self.assertEqual(doc.active_part.active_solid.volume, 100.0 * 60.0 * 35.0)
 
     def test_revolve_feature(self):
-        doc = Document(name="RevolveTest")
+        doc = create_test_document(name="RevolveTest")
         sk_feat = SketchFeature(name="Sketch_Revolve")
         sk_feat.sketch.add_rectangle(20.0, 40.0, center_u=30.0, center_v=0.0)
         doc.add_feature(sk_feat)
@@ -47,7 +48,7 @@ class TestV02ParametricFeatures(unittest.TestCase):
         self.assertGreater(doc.active_part.active_solid.volume, 0.0)
 
     def test_pattern_and_chamfer_features(self):
-        doc = Document(name="PatternTest")
+        doc = create_test_document(name="PatternTest")
         box = BoxFeature(width=20.0, height=20.0, depth=10.0)
         doc.add_feature(box)
         vol_single = doc.active_part.active_solid.volume
@@ -63,7 +64,7 @@ class TestV02ParametricFeatures(unittest.TestCase):
         self.assertTrue(doc.active_part.active_solid.is_valid)
 
     def test_ai_agent_sketch_and_extrude_prompt(self):
-        doc = Document(name="AIAgentSketchTest")
+        doc = create_test_document(name="AIAgentSketchTest")
         agent = CADAgent(doc)
 
         # Prompt 1: Create sketch
@@ -83,7 +84,7 @@ class TestV02ParametricFeatures(unittest.TestCase):
         self.assertEqual(doc.active_part.active_solid.volume, 100.0 * 60.0 * 25.0)
 
     def test_sketch_extrude_on_mounting_plate(self):
-        doc = Document(name="PlateWithExtrudeBoss")
+        doc = create_test_document(name="PlateWithExtrudeBoss")
         agent = CADAgent(doc)
 
         # 1. Create base mounting plate

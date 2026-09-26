@@ -61,6 +61,109 @@ class CreateSketchCommand(Command):
         return tx
 
 
+class AddSketchRectangleCommand(Command):
+    """
+    Adds a 2D rectangle to an existing SketchFeature inside an undoable transaction.
+    """
+    def __init__(
+        self,
+        sketch_feature_id: str,
+        width: float,
+        height: float,
+        centered: bool = True,
+        provenance: str = "user",
+    ) -> None:
+        self.sketch_feature_id = sketch_feature_id
+        self.width = width
+        self.height = height
+        self.centered = centered
+        self.provenance = provenance
+
+    def execute(self, document: Document) -> AITransaction:
+        sk_feat = document.get_feature(self.sketch_feature_id)
+        if not isinstance(sk_feat, SketchFeature):
+            raise KeyError(f"Feature '{self.sketch_feature_id}' is not a SketchFeature")
+
+        sketch = sk_feat.sketch
+        prev_elements_count = len(sketch.elements)
+
+        tx = AITransaction(
+            title=f"Add {self.width}x{self.height}mm Rectangle to {sk_feat.name}",
+            affected_features=[sk_feat.id],
+        )
+
+        def do() -> None:
+            sketch.add_rectangle(self.width, self.height, centered=self.centered)
+            document.recompute()
+
+        def undo() -> None:
+            # Revert added rectangle lines
+            while len(sketch.elements) > prev_elements_count:
+                sketch.elements.pop()
+            document.recompute()
+
+        do()
+        tx.changes.append(
+            TransactionChange(
+                description=f"Added {self.width}x{self.height}mm rectangle to {sk_feat.name}",
+                undo_action=undo,
+                redo_action=do,
+            )
+        )
+        tx.is_committed = True
+        document.history.push_transaction(tx)
+        return tx
+
+
+class AddSketchCircleCommand(Command):
+    """
+    Adds a 2D circle to an existing SketchFeature inside an undoable transaction.
+    """
+    def __init__(
+        self,
+        sketch_feature_id: str,
+        radius: float,
+        provenance: str = "user",
+    ) -> None:
+        self.sketch_feature_id = sketch_feature_id
+        self.radius = radius
+        self.provenance = provenance
+
+    def execute(self, document: Document) -> AITransaction:
+        sk_feat = document.get_feature(self.sketch_feature_id)
+        if not isinstance(sk_feat, SketchFeature):
+            raise KeyError(f"Feature '{self.sketch_feature_id}' is not a SketchFeature")
+
+        sketch = sk_feat.sketch
+        prev_elements_count = len(sketch.elements)
+
+        tx = AITransaction(
+            title=f"Add R{self.radius}mm Circle to {sk_feat.name}",
+            affected_features=[sk_feat.id],
+        )
+
+        def do() -> None:
+            sketch.add_circle(self.radius)
+            document.recompute()
+
+        def undo() -> None:
+            while len(sketch.elements) > prev_elements_count:
+                sketch.elements.pop()
+            document.recompute()
+
+        do()
+        tx.changes.append(
+            TransactionChange(
+                description=f"Added R{self.radius}mm circle to {sk_feat.name}",
+                undo_action=undo,
+                redo_action=do,
+            )
+        )
+        tx.is_committed = True
+        document.history.push_transaction(tx)
+        return tx
+
+
 class ExtrudeSketchCommand(Command):
     def __init__(
         self,

@@ -16,6 +16,8 @@ from softwork.commands.feature_commands import (
     AddPatternCommand,
     AddHoleWizardCommand,
     AddShellCommand,
+    AddSketchRectangleCommand,
+    AddSketchCircleCommand,
 )
 from softwork.commands.parameter_commands import SetParameterCommand
 from softwork.core.document import Document
@@ -325,16 +327,22 @@ class ToolRegistry:
         w = float(args["width"])
         h = float(args["height"])
         centered = bool(args.get("centered", True))
-        sk_feat.sketch.add_rectangle(w, h, centered=centered)
-        self.document.recompute()
-        return AITransaction(title=f"Add {w}x{h}mm Rectangle to {sk_feat.name}", is_committed=True)
+        return AddSketchRectangleCommand(
+            sketch_feature_id=sk_feat.id,
+            width=w,
+            height=h,
+            centered=centered,
+            provenance="ai",
+        ).execute(self.document)
 
     def _handle_sketch_add_circle(self, args: Dict[str, Any]) -> AITransaction:
         sk_feat = self._find_sketch_feature(args.get("sketch_id"))
         r = float(args["radius"])
-        sk_feat.sketch.add_circle(r)
-        self.document.recompute()
-        return AITransaction(title=f"Add R{r}mm Circle to {sk_feat.name}", is_committed=True)
+        return AddSketchCircleCommand(
+            sketch_feature_id=sk_feat.id,
+            radius=r,
+            provenance="ai",
+        ).execute(self.document)
 
     def _handle_feature_extrude(self, args: Dict[str, Any]) -> AITransaction:
         sk_feat = self._find_sketch_feature(args.get("sketch_id"))

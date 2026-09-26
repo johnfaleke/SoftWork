@@ -5,8 +5,8 @@ from __future__ import annotations
 import uuid
 from typing import Optional, Dict, Any
 
-from softwork.cad.backend import CADBackend
-from softwork.cad.direct_backend import DirectGeometryBackend
+from softwork.cad.backend import CADBackend, CADKernelError
+from softwork.cad.direct_backend import PrototypeGeometryBackend, DirectGeometryBackend
 from softwork.cad.geometry import MeshData
 from softwork.cad.topology import CADShape
 from softwork.sketch.profile import SketchProfile
@@ -34,6 +34,27 @@ class CadQueryBackend(CADBackend):
                     "CadQuery/OCP is not installed in the active environment. "
                     "Install with conda or 'pip install cadquery'."
                 )
+
+    @property
+    def capabilities(self) -> BackendCapabilities:
+        from softwork.cad.capabilities import BackendCapabilities
+        if self._has_cadquery:
+            return BackendCapabilities(
+                name="CadQueryBackend",
+                is_available=True,
+                is_authoritative_brep=True,
+                supports_step=True,
+                supports_stl=True,
+                diagnostic_message="OpenCASCADE/CadQuery B-rep kernel is active and authoritative.",
+            )
+        return BackendCapabilities(
+            name="CadQueryBackend",
+            is_available=False,
+            is_authoritative_brep=True,
+            supports_step=True,
+            supports_stl=True,
+            diagnostic_message="CadQuery/OpenCASCADE kernel is unavailable. Install with conda or 'pip install cadquery'.",
+        )
 
     def name(self) -> str:
         return "CadQueryBackend"

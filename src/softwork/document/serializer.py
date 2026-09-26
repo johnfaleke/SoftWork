@@ -33,12 +33,12 @@ def save_document(document: Document, filepath: str) -> None:
         json.dump(data, f, indent=2)
 
 
-def load_document(filepath: str) -> Document:
+def load_document(filepath: str, backend: Optional[CADBackend] = None) -> Document:
     with open(filepath, "r", encoding="utf-8") as f:
         data = json.load(f)
 
     doc_data = data["document"]
-    doc = Document(name=doc_data.get("name", "Untitled Document"))
+    doc = Document(name=doc_data.get("name", "Untitled Document"), backend=backend)
     doc.id = doc_data.get("id", doc.id)
     doc.parts.clear()
 

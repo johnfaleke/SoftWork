@@ -9,6 +9,7 @@ from softwork.core.document import Document
 from softwork.core.feature import MountingPlateFeature, ExtrudeFeature
 from softwork.core.semantic import SemanticTopologyMatcher, SemanticRole, SemanticReference
 from softwork.commands.feature_commands import CreateMountingPlateCommand, CreateSketchCommand, ExtrudeSketchCommand
+from tests.test_helpers import create_test_document
 
 
 class TestV04AIParametricEditing(unittest.TestCase):
@@ -18,7 +19,7 @@ class TestV04AIParametricEditing(unittest.TestCase):
     """
 
     def test_nlp_in_place_thickness_modification(self) -> None:
-        doc = Document(name="PlateWorkflow.softwork")
+        doc = create_test_document(name="PlateWorkflow.softwork")
         agent = CADAgent(doc)
 
         # 1. Create initial mounting plate
@@ -44,7 +45,7 @@ class TestV04AIParametricEditing(unittest.TestCase):
         self.assertIn("thickness", res3.explanation.lower())
 
     def test_nlp_hole_and_fillet_modifications(self) -> None:
-        doc = Document(name="HoleFillet.softwork")
+        doc = create_test_document(name="HoleFillet.softwork")
         agent = CADAgent(doc)
 
         CreateMountingPlateCommand(length=100.0, width=60.0, thickness=10.0, hole_diameter=8.0, fillet_radius=2.0).execute(doc)
@@ -61,7 +62,7 @@ class TestV04AIParametricEditing(unittest.TestCase):
         self.assertAlmostEqual(plate.parameters["fillet_radius"].value, 4.0)
 
     def test_batch_dimension_modification(self) -> None:
-        doc = Document(name="BatchDim.softwork")
+        doc = create_test_document(name="BatchDim.softwork")
         agent = CADAgent(doc)
 
         CreateMountingPlateCommand(length=100.0, width=60.0, thickness=10.0).execute(doc)
@@ -73,7 +74,7 @@ class TestV04AIParametricEditing(unittest.TestCase):
         self.assertAlmostEqual(plate.parameters["length"].value, 120.0)
 
     def test_semantic_reference_tagging_and_matching(self) -> None:
-        doc = Document(name="SemanticDoc.softwork")
+        doc = create_test_document(name="SemanticDoc.softwork")
         CreateMountingPlateCommand(length=100.0, width=60.0, thickness=10.0).execute(doc)
 
         solid = doc.active_part.active_solid

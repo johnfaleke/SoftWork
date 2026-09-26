@@ -7,6 +7,7 @@ from typing import Optional, List, Tuple, Dict, Any
 
 from softwork.cad.geometry import MeshData
 from softwork.cad.topology import CADShape
+from softwork.cad.capabilities import BackendCapabilities
 from softwork.sketch.profile import SketchProfile
 from softwork.sketch.plane import SketchPlane
 
@@ -21,6 +22,12 @@ class CADBackend(ABC):
     Abstract interface for geometric kernel operations.
     Decouples document/feature logic from underlying CAD libraries (CadQuery, OpenCASCADE, Direct OCCT).
     """
+
+    @property
+    @abstractmethod
+    def capabilities(self) -> BackendCapabilities:
+        """Returns the capabilities and diagnostic state of this backend."""
+        pass
 
     @abstractmethod
     def name(self) -> str:

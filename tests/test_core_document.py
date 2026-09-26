@@ -6,6 +6,7 @@ from softwork.core.document import Document
 from softwork.core.parameter import Parameter
 from softwork.core.feature import BoxFeature, MountingPlateFeature
 from softwork.commands.parameter_commands import SetParameterCommand
+from tests.test_helpers import create_test_document
 
 
 class TestCoreDocument(unittest.TestCase):
@@ -22,7 +23,7 @@ class TestCoreDocument(unittest.TestCase):
         self.assertAlmostEqual(p3.canonical_value, 1.570796, places=4)
 
     def test_document_parametric_recompute(self):
-        doc = Document(name="TestDoc")
+        doc = create_test_document(name="TestDoc")
         plate = MountingPlateFeature(
             length=100.0,
             width=60.0,
@@ -50,7 +51,7 @@ class TestCoreDocument(unittest.TestCase):
         self.assertEqual(doc.get_feature(plate.id).get_parameter("thickness").value, 10.0)
 
     def test_material_and_mass_properties(self):
-        doc = Document(name="MaterialDoc")
+        doc = create_test_document(name="MaterialDoc")
         plate = MountingPlateFeature(length=100.0, width=60.0, thickness=10.0, hole_diameter=0.0)
         doc.add_feature(plate)
 

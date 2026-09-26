@@ -107,9 +107,10 @@
 py run_tests.py
 ```
 
-### Test Suites Summary (39 Tests Passing)
+### Test Suites Summary (46 Tests Passing)
 | Test File | Covered Functionality | Result |
 | :--- | :--- | :--- |
+| [`tests/test_backend_authority.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/tests/test_backend_authority.py) | Document CadQuery default authority, absence of silent fallback, PrototypeGeometryBackend isolation, STEP export safety (blocking non-B-rep export), rebuild failure safety & `previous_valid_shape` retention, atomic transaction rollback, and AI sketch entity undoability | ✅ Passed |
 | [`tests/test_real_parametric_chain.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/tests/test_real_parametric_chain.py) | Canonical parametric feature chain (`Sketch` -> `Extrude` -> `Hole` -> `Pattern` -> `Fillet`), parameter mutation, DAG failure cascade, model recovery, and round-trip serialization | ✅ Passed |
 | [`tests/test_v04_ai_parametric_editing.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/tests/test_v04_ai_parametric_editing.py) | In-place parametric thickness/hole/fillet modification, multi-parameter batch dimension edits, and semantic topological reference tagging | ✅ Passed |
 | [`tests/test_core_document.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/tests/test_core_document.py) | Parameter unit conversions (`in`, `mm`, `deg`), DAG recomputation, history undo/redo, Material densities, and mass evaluation | ✅ Passed |

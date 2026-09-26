@@ -7,7 +7,8 @@ import datetime
 from typing import Dict, List, Optional, Any, Callable
 
 from softwork.cad.backend import CADBackend
-from softwork.cad.direct_backend import DirectGeometryBackend
+from softwork.cad.cadquery_backend import CadQueryBackend
+from softwork.cad.capabilities import BackendCapabilities
 from softwork.cad.topology import CADShape
 from softwork.cad.validation import GeometryValidator, ValidationReport
 from softwork.core.dependency import DependencyGraph
@@ -29,7 +30,7 @@ class Document:
         self.id: str = f"doc_{uuid.uuid4().hex[:8]}"
         self.name: str = name
         self.created_at: str = datetime.datetime.now().isoformat()
-        self.backend: CADBackend = backend or DirectGeometryBackend()
+        self.backend: CADBackend = backend or CadQueryBackend()
         self.material: Material = DEFAULT_MATERIAL
         
         self.parts: List[Part] = []
@@ -45,6 +46,11 @@ class Document:
         # Create default Part001
         default_part = Part(name="Part001")
         self.parts.append(default_part)
+
+    @property
+    def backend_capabilities(self) -> BackendCapabilities:
+        """Returns the geometric capability and availability state of the active backend."""
+        return self.backend.capabilities
 
     @property
     def active_part(self) -> Part:
@@ -92,7 +98,8 @@ class Document:
         1. Syncs all feature dependencies into the DAG.
         2. Resolves topological execution order.
         3. Propagates dirty/failure states down the dependency chain.
-        4. Validates each generated shape with GeometryValidator.
+        4. Preserves last valid shape on failure.
+        5. Validates each generated shape with GeometryValidator.
         """
         context_shapes: Dict[str, CADShape] = {}
         report = ValidationReport()
@@ -135,6 +142,8 @@ class Document:
                 if dep in failed_nodes:
                     feature.status = FeatureStatus.FAILED
                     feature.error_message = f"Dependency '{dep}' failed evaluation"
+                    # Preserve last valid shape
+                    feature.generated_shape = feature.previous_valid_shape
                     failed_nodes.add(feat_id)
                     report.add_issue(
                         code="DEPENDENCY_FAILED",
@@ -153,6 +162,7 @@ class Document:
                 context_shapes[feature.id] = shape
                 feature.status = FeatureStatus.VALID
                 feature.error_message = None
+                feature.previous_valid_shape = shape
                 feature.generated_shape = shape
 
                 # Validate individual feature shape
@@ -168,6 +178,8 @@ class Document:
             except Exception as e:
                 feature.status = FeatureStatus.FAILED
                 feature.error_message = str(e)
+                # Preserve last valid shape on failure
+                feature.generated_shape = feature.previous_valid_shape
                 failed_nodes.add(feat_id)
                 report.add_issue(
                     code="FEATURE_EVAL_FAILED",
@@ -181,8 +193,9 @@ class Document:
             for feat_id in topo_order:
                 if feat_id in all_features and any(f.id == feat_id for f in part.features):
                     f = all_features[feat_id]
-                    if f.status == FeatureStatus.VALID and f.generated_shape and f.generated_shape.volume > 0:
-                        last_valid_solid = f.generated_shape
+                    candidate = f.generated_shape if f.status == FeatureStatus.VALID else f.previous_valid_shape
+                    if candidate and candidate.volume > 0 and candidate.shape_type != "sketch_wire":
+                        last_valid_solid = candidate
             part.active_solid = last_valid_solid
 
         self.latest_validation = report

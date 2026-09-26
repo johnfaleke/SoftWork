@@ -7,11 +7,12 @@ from softwork.core.feature import BoxFeature, MountingPlateFeature, HoleWizardFe
 from softwork.commands.feature_commands import AddHoleWizardCommand, AddShellCommand
 from softwork.ai.agent import CADAgent
 from softwork.ai.provider import HeuristicEngineProvider, GeminiProvider, OpenAIProvider, AnthropicProvider
+from tests.test_helpers import create_test_document
 
 
 class TestV03AICopilotAndAdvancedFeatures(unittest.TestCase):
     def test_hole_wizard_feature(self):
-        doc = Document(name="HoleWizardTest")
+        doc = create_test_document(name="HoleWizardTest")
         box = BoxFeature(width=80.0, height=80.0, depth=20.0)
         doc.add_feature(box)
         initial_vol = doc.active_part.active_solid.volume
@@ -25,7 +26,7 @@ class TestV03AICopilotAndAdvancedFeatures(unittest.TestCase):
         self.assertLess(doc.active_part.active_solid.volume, initial_vol)
 
     def test_shell_feature(self):
-        doc = Document(name="ShellTest")
+        doc = create_test_document(name="ShellTest")
         box = BoxFeature(width=60.0, height=60.0, depth=40.0)
         doc.add_feature(box)
         solid_vol = doc.active_part.active_solid.volume
@@ -39,7 +40,7 @@ class TestV03AICopilotAndAdvancedFeatures(unittest.TestCase):
         self.assertLess(doc.active_part.active_solid.volume, solid_vol)
 
     def test_ai_copilot_plan_and_ghost_preview(self):
-        doc = Document(name="AIPlanTest")
+        doc = create_test_document(name="AIPlanTest")
         agent = CADAgent(doc)
 
         # Plan prompt
@@ -50,7 +51,7 @@ class TestV03AICopilotAndAdvancedFeatures(unittest.TestCase):
         self.assertGreater(plan.predicted_delta_vol, 0.0)
 
     def test_ai_copilot_hole_wizard_and_shell_prompt(self):
-        doc = Document(name="AIEnhancedPromptTest")
+        doc = create_test_document(name="AIEnhancedPromptTest")
         agent = CADAgent(doc)
 
         # Step 1: Create box

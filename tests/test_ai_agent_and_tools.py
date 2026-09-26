@@ -4,11 +4,12 @@ Tests for CADAgent, AI tools, and natural language command execution pipeline.
 import unittest
 from softwork.core.document import Document
 from softwork.ai.agent import CADAgent
+from tests.test_helpers import create_test_document
 
 
 class TestAIAgentAndTools(unittest.TestCase):
     def test_ai_agent_mounting_plate_workflow(self):
-        doc = Document(name="AgentTestDoc")
+        doc = create_test_document(name="AgentTestDoc")
         agent = CADAgent(doc)
 
         # 1. Natural language: Create a 100 x 60 x 10 mm mounting plate

@@ -19,6 +19,7 @@ from softwork.core.feature import (
 )
 from softwork.document.serializer import save_document, load_document
 from softwork.sketch.plane import SketchPlane, StandardPlane
+from tests.test_helpers import get_test_backend
 
 
 class TestRealParametricChain(unittest.TestCase):
@@ -27,7 +28,8 @@ class TestRealParametricChain(unittest.TestCase):
     """
 
     def test_canonical_parametric_chain_lifecycle(self) -> None:
-        doc = Document(name="BracketPart")
+        backend = get_test_backend()
+        doc = Document(name="BracketPart", backend=backend)
         part = doc.active_part
 
         # 1. Sketch001: 100 x 60 mm rectangle on XY plane
@@ -139,7 +141,7 @@ class TestRealParametricChain(unittest.TestCase):
 
         try:
             save_document(doc, temp_path)
-            loaded_doc = load_document(temp_path)
+            loaded_doc = load_document(temp_path, backend=backend)
 
             self.assertEqual(len(loaded_doc.active_part.features), 5)
             loaded_ext = loaded_doc.get_feature(ext_feat.id)
