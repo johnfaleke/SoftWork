@@ -69,8 +69,8 @@
 ### 6. Desktop User Interface (`softwork.ui`)
 | Module / File | Description | Status |
 | :--- | :--- | :--- |
-| [`ui/viewport.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/ui/viewport.py) | 3D Canvas with Orbit, Pan, Zoom, Lighting, and **Interactive Face Raycasting Picking** | ✅ Complete |
-| [`ui/main_window.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/ui/main_window.py) | Menubar, Design Toolbar (`Sketch`, `Extrude`, `Revolve`, `Pattern`, `Chamfer`), Tree, Properties, AI Bar | ✅ Complete |
+| [`ui/viewport.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/ui/viewport.py) | 3D Canvas with Orbit, Pan, Zoom, Lighting, **2D Sketch Wireframe / Vertex Dot Rasterization**, and **Interactive Face Raycasting Picking** | ✅ Complete |
+| [`ui/main_window.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/ui/main_window.py) | Menubar, Design Toolbar (`Sketch`, `Extrude`, `Revolve`, `Pattern`, `Chamfer`), Tree, Properties with sketch shape shortcuts, AI Bar | ✅ Complete |
 | [`app/main.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/app/main.py) | Application bootstrap and CLI entry point | ✅ Complete |
 
 ---
@@ -82,17 +82,17 @@
 py run_tests.py
 ```
 
-### Test Suites Summary (16 Tests)
+### Test Suites Summary (17 Tests)
 | Test File | Covered Functionality | Result |
 | :--- | :--- | :--- |
 | [`tests/test_sketch_and_profiles.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/tests/test_sketch_and_profiles.py) | Sketch plane transforms, rectangle/circle 2D profiles, Shoelace area, and loop detection | ✅ Passed |
-| [`tests/test_v02_parametric_features.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/tests/test_v02_parametric_features.py) | Sketch extrusion, revolution, linear pattern, chamfer, and AI agent sketch-to-extrude flow | ✅ Passed |
+| [`tests/test_v02_parametric_features.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/tests/test_v02_parametric_features.py) | Sketch extrusion, multi-solid boolean join on mounting plate, revolution, linear pattern, chamfer, and AI agent sketch-to-extrude flow | ✅ Passed |
 | [`tests/test_geometry_and_backend.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/tests/test_geometry_and_backend.py) | Box creation, mounting plate with holes, tessellation, bounds, volume, and fillet validation | ✅ Passed |
 | [`tests/test_core_document.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/tests/test_core_document.py) | Parameter unit conversions (`in`, `mm`, `deg`), DAG recomputation, and undo/redo history | ✅ Passed |
 | [`tests/test_ai_agent_and_tools.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/tests/test_ai_agent_and_tools.py) | CAD agent natural-language creation, hole additions, filleting, and thickness update | ✅ Passed |
 | [`tests/test_formats_and_serialization.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/tests/test_formats_and_serialization.py) | Save/load `.softwork` document files, STEP AP214 export, and binary STL exports | ✅ Passed |
 
-**Result:** 16 tests ran in 2.170s — **100% OK**.
+**Result:** 17 tests ran in 2.268s — **100% OK**.
 
 ---
 
@@ -102,8 +102,10 @@ py run_tests.py
 ```bash
 py src/softwork/app/main.py
 ```
+- **2D Visual Sketching in 3D Viewport:** Active sketches render emerald wire loops, vertex dots, datum plane boundary lines, and sketch origin tags.
+- **Extrude on Mounting Plate:** Extrusions created on top of base plates automatically boolean-join and recalculate composite solid volume.
 - **3D Face Picking:** Click on any surface in the 3D viewport to highlight it in gold and view normal/index in the status bar.
-- **2D Sketch & Extrude:** Click `✏️ New Sketch` or type `"Create sketch on XY plane"` then `"Add a 100 x 60 mm rectangle"` and `"Extrude by 25 mm"`.
+- **Quick Sketch Shortcuts:** Properties inspector provides instant `➕ 50×30 Rect`, `➕ R15 Circle`, and `🚀 Extrude This Sketch` buttons.
 - **Revolve:** Click `🔁 Revolve` or type `"Revolve the sketch by 360 degrees"`.
 - **Linear Pattern & Chamfer:** Duplicate parts into array patterns and apply edge chamfers.
 
