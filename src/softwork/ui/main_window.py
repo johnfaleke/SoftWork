@@ -135,7 +135,7 @@ class MainWindow(tk.Tk):
         edit_menu.add_command(label="Undo", command=self._action_undo, accelerator="Ctrl+Z")
         edit_menu.add_command(label="Redo", command=self._action_redo, accelerator="Ctrl+Y")
         edit_menu.add_separator()
-        edit_menu.add_command(label="⚙️ Workspace Settings & Themes...", command=self._action_open_settings)
+        edit_menu.add_command(label="Workspace Settings and Themes...", command=self._action_open_settings)
         menubar.add_cascade(label="Edit", menu=edit_menu)
 
         design_menu = tk.Menu(menubar, tearoff=0, bg=th.bg_panel, fg=th.fg_primary)
@@ -161,16 +161,16 @@ class MainWindow(tk.Tk):
         theme_menu = tk.Menu(view_menu, tearoff=0, bg=th.bg_panel, fg=th.fg_primary)
         for tname in self.theme_manager.themes.keys():
             theme_menu.add_command(label=tname, command=lambda name=tname: self._switch_theme(name))
-        view_menu.add_cascade(label="🎨 Themes", menu=theme_menu)
+        view_menu.add_cascade(label="Themes", menu=theme_menu)
         
         menubar.add_cascade(label="View", menu=view_menu)
 
         ai_menu = tk.Menu(menubar, tearoff=0, bg=th.bg_panel, fg=th.fg_primary)
         ai_menu.add_command(label="Toggle Floating AI Copilot", command=self._toggle_ai_copilot)
-        ai_menu.add_command(label="⚙️ Configure Cloud AI Keys (Gemini / Claude / OpenAI)...", command=self._action_configure_api_keys)
+        ai_menu.add_command(label="Configure Cloud AI Keys (Gemini / Claude / OpenAI)...", command=self._action_configure_api_keys)
         ai_menu.add_separator()
         ai_menu.add_command(label="Run Mounting Plate Flow", command=self._action_run_demo_flow)
-        ai_menu.add_command(label="Run Sketch & Extrude Flow", command=self._action_run_sketch_demo)
+        ai_menu.add_command(label="Run Sketch and Extrude Flow", command=self._action_run_sketch_demo)
         menubar.add_cascade(label="AI", menu=ai_menu)
 
         self.config(menu=menubar)
@@ -182,47 +182,47 @@ class MainWindow(tk.Tk):
         self.toolbar.pack(side=tk.TOP, fill=tk.X)
 
         # Modeling tools group
-        btn_sk = ttk.Button(self.toolbar, text="✏️ Sketch", command=lambda: self._action_create_sketch("XY"))
+        btn_sk = ttk.Button(self.toolbar, text="Sketch", command=lambda: self._action_create_sketch("XY"))
         btn_sk.pack(side=tk.LEFT, padx=2)
 
-        btn_mode_sel = ttk.Button(self.toolbar, text="👆 Select", command=lambda: self._set_draw_mode("SELECT"))
+        btn_mode_sel = ttk.Button(self.toolbar, text="Select", command=lambda: self._set_draw_mode("SELECT"))
         btn_mode_sel.pack(side=tk.LEFT, padx=2)
 
-        btn_draw_rect = ttk.Button(self.toolbar, text="▭ Rect", command=lambda: self._set_draw_mode("DRAW_RECTANGLE"))
+        btn_draw_rect = ttk.Button(self.toolbar, text="Rectangle", command=lambda: self._set_draw_mode("DRAW_RECTANGLE"))
         btn_draw_rect.pack(side=tk.LEFT, padx=2)
 
-        btn_draw_circ = ttk.Button(self.toolbar, text="⭕ Circle", command=lambda: self._set_draw_mode("DRAW_CIRCLE"))
+        btn_draw_circ = ttk.Button(self.toolbar, text="Circle", command=lambda: self._set_draw_mode("DRAW_CIRCLE"))
         btn_draw_circ.pack(side=tk.LEFT, padx=2)
 
-        btn_draw_line = ttk.Button(self.toolbar, text="╱ Line", command=lambda: self._set_draw_mode("DRAW_LINE"))
+        btn_draw_line = ttk.Button(self.toolbar, text="Line", command=lambda: self._set_draw_mode("DRAW_LINE"))
         btn_draw_line.pack(side=tk.LEFT, padx=2)
 
         # Separator
         sep1 = tk.Frame(self.toolbar, bg=th.border, width=1, height=24)
         sep1.pack(side=tk.LEFT, padx=6, fill=tk.Y)
 
-        btn_ext = ttk.Button(self.toolbar, text="⬆️ Extrude", command=self._action_extrude_sketch)
+        btn_ext = ttk.Button(self.toolbar, text="Extrude", command=self._action_extrude_sketch)
         btn_ext.pack(side=tk.LEFT, padx=2)
 
-        btn_rev = ttk.Button(self.toolbar, text="🔁 Revolve", command=self._action_revolve_sketch)
+        btn_rev = ttk.Button(self.toolbar, text="Revolve", command=self._action_revolve_sketch)
         btn_rev.pack(side=tk.LEFT, padx=2)
 
-        btn_hole = ttk.Button(self.toolbar, text="🔩 Hole", command=self._action_add_hole_wizard)
+        btn_hole = ttk.Button(self.toolbar, text="Hole Wizard", command=self._action_add_hole_wizard)
         btn_hole.pack(side=tk.LEFT, padx=2)
 
-        btn_shell = ttk.Button(self.toolbar, text="🐚 Shell", command=self._action_add_shell)
+        btn_shell = ttk.Button(self.toolbar, text="Shell", command=self._action_add_shell)
         btn_shell.pack(side=tk.LEFT, padx=2)
 
-        btn_box = ttk.Button(self.toolbar, text="➕ Box", command=self._action_create_box)
+        btn_box = ttk.Button(self.toolbar, text="Box Primitive", command=self._action_create_box)
         btn_box.pack(side=tk.LEFT, padx=2)
 
-        btn_plate = ttk.Button(self.toolbar, text="➕ Plate", command=self._action_create_plate)
+        btn_plate = ttk.Button(self.toolbar, text="Plate Primitive", command=self._action_create_plate)
         btn_plate.pack(side=tk.LEFT, padx=2)
 
         # Right tools
         btn_copilot_toggle = tk.Button(
             self.toolbar,
-            text="✨ AI Copilot",
+            text="Parametric Copilot",
             bg=th.bg_hover,
             fg=th.fg_accent,
             activebackground=th.accent_btn_bg,
@@ -235,13 +235,13 @@ class MainWindow(tk.Tk):
         )
         btn_copilot_toggle.pack(side=tk.RIGHT, padx=4)
 
-        btn_settings = ttk.Button(self.toolbar, text="⚙️ Settings", command=self._action_open_settings)
+        btn_settings = ttk.Button(self.toolbar, text="Settings", command=self._action_open_settings)
         btn_settings.pack(side=tk.RIGHT, padx=3)
 
-        btn_redo = ttk.Button(self.toolbar, text="⟳ Redo", command=self._action_redo)
+        btn_redo = ttk.Button(self.toolbar, text="Redo", command=self._action_redo)
         btn_redo.pack(side=tk.RIGHT, padx=2)
 
-        btn_undo = ttk.Button(self.toolbar, text="⟲ Undo", command=self._action_undo)
+        btn_undo = ttk.Button(self.toolbar, text="Undo", command=self._action_undo)
         btn_undo.pack(side=tk.RIGHT, padx=2)
 
     def _build_ide_workspace(self) -> None:
@@ -371,9 +371,9 @@ class MainWindow(tk.Tk):
 
     def _on_copilot_prompt_executed(self, result: AgentExecutionResult) -> None:
         if result.success:
-            self.status_bar.config(text=f"✨ AI: {result.explanation}", fg=self.theme.fg_accent)
+            self.status_bar.config(text=f"AI: {result.explanation}", fg=self.theme.fg_accent)
         else:
-            self.status_bar.config(text=f"⚠️ AI Error: {result.error_message}", fg=self.theme.color_error)
+            self.status_bar.config(text=f"AI Error: {result.error_message}", fg=self.theme.color_error)
             messagebox.showwarning("CAD Agent Notice", result.error_message)
         self._refresh_all()
 
@@ -424,7 +424,7 @@ class MainWindow(tk.Tk):
                 break
         self.viewport.set_tool_mode(mode, active_plane=active_plane)
         mode_label = mode.replace("DRAW_", "").title() if mode != "SELECT" else "Select / Orbit"
-        self.status_bar.config(text=f"🎯 Tool Mode: {mode_label} | Click & Drag on 3D Viewport to sketch", fg=self.theme.fg_accent)
+        self.status_bar.config(text=f"Tool Mode: {mode_label} | Click & Drag on 3D Viewport to sketch", fg=self.theme.fg_accent)
 
     def _on_viewport_shape_drawn(self, shape_type: str, data: Dict[str, Any]) -> None:
         sk_feat = None
@@ -461,11 +461,11 @@ class MainWindow(tk.Tk):
 
             self.document.recompute()
             self._refresh_all()
-            self.status_bar.config(text=f"✏️ Added {shape_type.title()} to {sk_feat.name}", fg=self.theme.color_success)
+            self.status_bar.config(text=f"Added {shape_type.title()} to {sk_feat.name}", fg=self.theme.color_success)
 
     def _on_face_picked(self, face_idx: int, normal: Tuple[float, float, float]) -> None:
         self.status_bar.config(
-            text=f"📍 Selected Surface: Face #{face_idx} | Normal: ({normal[0]:.2f}, {normal[1]:.2f}, {normal[2]:.2f})",
+            text=f"Selected Surface: Face #{face_idx} | Normal: ({normal[0]:.2f}, {normal[1]:.2f}, {normal[2]:.2f})",
             fg=self.theme.color_warning,
         )
 
@@ -498,16 +498,16 @@ class MainWindow(tk.Tk):
 
         # Update breadcrumb
         feat_name = self.document.active_part.features[-1].name if self.document.active_part.features else "Empty"
-        self.lbl_breadcrumb.config(text=f"{self.document.name} > {self.document.active_part.name} > {feat_name}")
+        self.lbl_breadcrumb.config(text=f"{self.document.name} / {self.document.active_part.name} / {feat_name}")
 
         val = self.document.latest_validation
         if val and not val.is_valid:
-            self.status_bar.config(text=f"⚠️ Validation Issue: {val.issues[0].message}", fg=self.theme.color_error)
+            self.status_bar.config(text=f"Validation Issue: {val.issues[0].message}", fg=self.theme.color_error)
         else:
             vol = solid.volume if solid else 0.0
             num_sk = len(sketches)
             sk_info = f" | {num_sk} Sketch(es) active" if num_sk > 0 else ""
-            self.status_bar.config(text=f"✓ Solid Valid | Volume: {vol:,.1f} mm³{sk_info} | Theme: {self.theme.name}", fg=self.theme.color_success)
+            self.status_bar.config(text=f"Solid Valid | Volume: {vol:,.1f} mm3{sk_info} | Theme: {self.theme.name}", fg=self.theme.color_success)
 
     def _refresh_properties(self) -> None:
         for widget in self.props_container.winfo_children():
@@ -537,15 +537,15 @@ class MainWindow(tk.Tk):
             
             btn_frame = tk.Frame(self.props_container, bg=th.bg_panel)
             btn_frame.pack(fill=tk.X, pady=6)
-            btn_add_rect = ttk.Button(btn_frame, text="➕ 50×30 Rect", command=lambda: self._add_rect_to_sketch(feature, 50.0, 30.0))
+            btn_add_rect = ttk.Button(btn_frame, text="Add 50x30 Rectangle", command=lambda: self._add_rect_to_sketch(feature, 50.0, 30.0))
             btn_add_rect.pack(fill=tk.X, pady=2)
-            btn_add_circ = ttk.Button(btn_frame, text="➕ R15 Circle", command=lambda: self._add_circ_to_sketch(feature, 15.0))
+            btn_add_circ = ttk.Button(btn_frame, text="Add R15 Circle", command=lambda: self._add_circ_to_sketch(feature, 15.0))
             btn_add_circ.pack(fill=tk.X, pady=2)
 
-            btn_solve = ttk.Button(btn_frame, text="📐 Solve Constraints (DOF)", command=lambda: self._solve_sketch_constraints(feature))
+            btn_solve = ttk.Button(btn_frame, text="Solve Constraints", command=lambda: self._solve_sketch_constraints(feature))
             btn_solve.pack(fill=tk.X, pady=2)
 
-            btn_ext = ttk.Button(btn_frame, text="🚀 Extrude This Sketch", style="Accent.TButton", command=self._action_extrude_sketch)
+            btn_ext = ttk.Button(btn_frame, text="Extrude This Sketch", style="Accent.TButton", command=self._action_extrude_sketch)
             btn_ext.pack(fill=tk.X, pady=4)
             return
 
@@ -571,7 +571,7 @@ class MainWindow(tk.Tk):
         report = sk_feat.sketch.solve()
         self.document.recompute()
         self._refresh_all()
-        status_msg = f"✓ Solver Converged ({report.iterations} iters) | DOF: {report.degrees_of_freedom}" if report.is_converged else f"⚠️ Unresolved: {', '.join(report.unresolved_constraints)}"
+        status_msg = f"Solver Converged ({report.iterations} iters) | DOF: {report.degrees_of_freedom}" if report.is_converged else f"Unresolved: {', '.join(report.unresolved_constraints)}"
         messagebox.showinfo("2D Constraint Solver Report", status_msg)
 
     def _add_rect_to_sketch(self, sk_feat: SketchFeature, w: float = 50.0, h: float = 30.0) -> None:

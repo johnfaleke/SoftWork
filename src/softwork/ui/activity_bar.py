@@ -53,8 +53,8 @@ class ActivityBar(tk.Frame):
 
         tabs = [
             ("tree", "Tree", "FeatureManager Design Tree"),
-            ("tools", "Feat", "Parametric Features & Tools"),
-            ("props", "Prop", "Properties Inspector"),
+            ("tools", "Features", "Parametric Features and Tools"),
+            ("props", "Properties", "Properties Inspector"),
         ]
 
         self.btn_map: Dict[str, tk.Button] = {}
@@ -68,14 +68,14 @@ class ActivityBar(tk.Frame):
                 fg=th.fg_accent if is_active else th.fg_secondary,
                 activebackground=th.bg_hover,
                 activeforeground=th.fg_accent,
-                font=("Segoe UI", 9, "bold"),
+                font=("Segoe UI", 8, "bold"),
                 bd=0,
-                width=4,
+                width=8,
                 height=1,
                 cursor="hand2",
                 command=lambda t=tab_id: self._select_tab(t),
             )
-            btn.pack(pady=4, padx=4)
+            btn.pack(pady=4, padx=2)
             self.btn_map[tab_id] = btn
 
         # Bottom Group: AI Copilot & Settings
@@ -84,35 +84,35 @@ class ActivityBar(tk.Frame):
 
         btn_ai = tk.Button(
             bottom_group,
-            text="AI",
+            text="Copilot",
             bg=th.bg_app,
             fg=th.fg_accent,
             activebackground=th.bg_hover,
             activeforeground=th.fg_accent,
-            font=("Segoe UI", 9, "bold"),
+            font=("Segoe UI", 8, "bold"),
             bd=0,
-            width=4,
+            width=8,
             height=1,
             cursor="hand2",
             command=self._on_ai_click,
         )
-        btn_ai.pack(pady=4, padx=4)
+        btn_ai.pack(pady=4, padx=2)
 
         btn_settings = tk.Button(
             bottom_group,
-            text="Cfg",
+            text="Settings",
             bg=th.bg_app,
             fg=th.fg_secondary,
             activebackground=th.bg_hover,
             activeforeground=th.fg_primary,
-            font=("Segoe UI", 9, "bold"),
+            font=("Segoe UI", 8, "bold"),
             bd=0,
-            width=4,
+            width=8,
             height=1,
             cursor="hand2",
             command=self._on_settings_click,
         )
-        btn_settings.pack(pady=4, padx=4)
+        btn_settings.pack(pady=4, padx=2)
 
     def _select_tab(self, tab_id: str) -> None:
         self.active_tab = tab_id

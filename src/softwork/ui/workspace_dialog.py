@@ -22,7 +22,7 @@ class WorkspaceSettingsDialog(tk.Toplevel):
         on_settings_applied: Optional[Callable[[WorkspaceSettings, ThemePalette], None]] = None,
     ) -> None:
         super().__init__(parent)
-        self.title("Workspace Settings & Theme Preferences — SoftWork")
+        self.title("Workspace Settings and Theme Preferences — SoftWork")
         self.geometry("580x560")
         self.minsize(520, 500)
         self.transient(parent)
@@ -44,7 +44,7 @@ class WorkspaceSettingsDialog(tk.Toplevel):
         header.pack(fill=tk.X)
         tk.Label(
             header,
-            text="⚙️ Workspace & Theme Preferences",
+            text="Workspace and Theme Preferences",
             font=("Segoe UI", 12, "bold"),
             bg=theme.bg_card,
             fg=theme.fg_accent,
@@ -63,7 +63,7 @@ class WorkspaceSettingsDialog(tk.Toplevel):
 
         # Tab 1: Appearance & Theme Presets
         tab_theme = tk.Frame(notebook, bg=theme.bg_panel, padx=14, pady=14)
-        notebook.add(tab_theme, text="🎨 Theme & Styling")
+        notebook.add(tab_theme, text="Theme and Styling")
 
         tk.Label(
             tab_theme,
@@ -90,7 +90,7 @@ class WorkspaceSettingsDialog(tk.Toplevel):
 
         self.lbl_swatch_title = tk.Label(
             self.swatch_frame,
-            text="Theme Preview: True Black & High Contrast Sketches",
+            text="Theme Preview: True Black and High Contrast Sketches",
             font=("Segoe UI", 9, "bold"),
             bg=theme.bg_card,
             fg=theme.fg_accent,
@@ -99,7 +99,7 @@ class WorkspaceSettingsDialog(tk.Toplevel):
 
         self.lbl_swatch_desc = tk.Label(
             self.swatch_frame,
-            text="Optimized for OLED & Dark workflows with black/grey backgrounds and neon high-visibility CAD elements.",
+            text="Optimized for OLED & Dark workflows with black/grey backgrounds and high-visibility CAD elements.",
             font=("Segoe UI", 8),
             bg=theme.bg_card,
             fg=theme.fg_secondary,
@@ -129,7 +129,7 @@ class WorkspaceSettingsDialog(tk.Toplevel):
 
         # Tab 2: 3D Viewport & Grid
         tab_view = tk.Frame(notebook, bg=theme.bg_panel, padx=14, pady=14)
-        notebook.add(tab_view, text="📐 3D Viewport & Grid")
+        notebook.add(tab_view, text="3D Viewport and Grid")
 
         self.grid_var = tk.BooleanVar(value=self.settings.show_grid)
         cb_grid = tk.Checkbutton(

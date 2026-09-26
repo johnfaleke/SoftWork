@@ -475,9 +475,9 @@ class CAD3DCanvas(tk.Canvas):
                 outline=self.theme.viewport_hud_border,
                 width=2
             )
-            vol_str = f"{'+' if self._ghost_delta_vol >= 0 else ''}{self._ghost_delta_vol:,.0f} mm³"
-            self.create_text(badge_x + 88, badge_y + 13, text="✨ AI Proposed Preview", fill=self.theme.fg_accent, font=("Segoe UI", 9, "bold"))
-            self.create_text(badge_x + 88, badge_y + 28, text=f"Δ Vol: {vol_str}", fill=self.theme.fg_primary, font=("Segoe UI", 8))
+            vol_str = f"{'+' if self._ghost_delta_vol >= 0 else ''}{self._ghost_delta_vol:,.0f} mm3"
+            self.create_text(badge_x + 88, badge_y + 13, text="AI Proposed Preview", fill=self.theme.fg_accent, font=("Segoe UI", 9, "bold"))
+            self.create_text(badge_x + 88, badge_y + 28, text=f"Delta Vol: {vol_str}", fill=self.theme.fg_primary, font=("Segoe UI", 8))
 
         # 3. Render 2D Sketches in 3D Space
         for sketch in self._sketches:
@@ -525,7 +525,7 @@ class CAD3DCanvas(tk.Canvas):
             sk_name = getattr(sketch, "name", "Sketch")
             self.create_text(
                 tag_proj[0], tag_proj[1] - 12,
-                text=f"✏️ {sk_name}",
+                text=sk_name,
                 fill=self.theme.viewport_sketch_line,
                 font=("Segoe UI", 9, "bold")
             )
@@ -545,7 +545,7 @@ class CAD3DCanvas(tk.Canvas):
                     self.create_line(proj_r[ri][0], proj_r[ri][1], proj_r[rnxt][0], proj_r[rnxt][1], fill=self.theme.fg_accent, width=2, dash=(4, 2))
                 w_mm = abs(u1 - u0)
                 h_mm = abs(v1 - v0)
-                self.create_text(proj_r[2][0] + 15, proj_r[2][1] - 10, text=f"📐 {w_mm:.1f} × {h_mm:.1f} mm", fill=self.theme.fg_accent, font=("Segoe UI", 10, "bold"))
+                self.create_text(proj_r[2][0] + 15, proj_r[2][1] - 10, text=f"Width: {w_mm:.1f} mm, Height: {h_mm:.1f} mm", fill=self.theme.fg_accent, font=("Segoe UI", 10, "bold"))
 
             elif self.tool_mode == "DRAW_CIRCLE":
                 r_mm = math.hypot(u1 - u0, v1 - v0)
@@ -562,18 +562,18 @@ class CAD3DCanvas(tk.Canvas):
                 cp0 = self._project_point(pl.to_3d(u0, v0, 0.0).x, pl.to_3d(u0, v0, 0.0).y, pl.to_3d(u0, v0, 0.0).z, cx, cy, rad_x, rad_y)
                 cp1 = self._project_point(pl.to_3d(u1, v1, 0.0).x, pl.to_3d(u1, v1, 0.0).y, pl.to_3d(u1, v1, 0.0).z, cx, cy, rad_x, rad_y)
                 self.create_line(cp0[0], cp0[1], cp1[0], cp1[1], fill=self.theme.viewport_ghost_mesh, width=1.5)
-                self.create_text(cp1[0] + 12, cp1[1] - 8, text=f"⭕ R = {r_mm:.1f} mm", fill=self.theme.fg_accent, font=("Segoe UI", 10, "bold"))
+                self.create_text(cp1[0] + 12, cp1[1] - 8, text=f"Radius: {r_mm:.1f} mm", fill=self.theme.fg_accent, font=("Segoe UI", 10, "bold"))
 
             elif self.tool_mode == "DRAW_LINE":
                 lp0 = self._project_point(pl.to_3d(u0, v0, 0.0).x, pl.to_3d(u0, v0, 0.0).y, pl.to_3d(u0, v0, 0.0).z, cx, cy, rad_x, rad_y)
                 lp1 = self._project_point(pl.to_3d(u1, v1, 0.0).x, pl.to_3d(u1, v1, 0.0).y, pl.to_3d(u1, v1, 0.0).z, cx, cy, rad_x, rad_y)
                 self.create_line(lp0[0], lp0[1], lp1[0], lp1[1], fill=self.theme.fg_accent, width=2.5)
                 len_mm = math.hypot(u1 - u0, v1 - v0)
-                self.create_text(lp1[0] + 12, lp1[1] - 8, text=f"📏 L = {len_mm:.1f} mm", fill=self.theme.fg_accent, font=("Segoe UI", 10, "bold"))
+                self.create_text(lp1[0] + 12, lp1[1] - 8, text=f"Length: {len_mm:.1f} mm", fill=self.theme.fg_accent, font=("Segoe UI", 10, "bold"))
 
         # 4. Viewport HUD Navigation Cube / Quick View Buttons (Top-Left)
         view_btns = [
-            ("Iso", self.set_view_isometric),
+            ("Isometric", self.set_view_isometric),
             ("Top", self.set_view_top),
             ("Front", self.set_view_front),
             ("Right", self.set_view_right),

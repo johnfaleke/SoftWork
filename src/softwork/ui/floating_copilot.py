@@ -77,7 +77,7 @@ class FloatingAICopilot(tk.Frame):
         prov_name = type(self.agent.provider).__name__.replace("Provider", "")
         lbl_badge = tk.Label(
             self.header,
-            text=f"[{prov_name}]",
+            text=prov_name.upper(),
             bg=th.bg_hover,
             fg=th.fg_accent,
             font=("Segoe UI", 7, "bold"),
@@ -87,7 +87,7 @@ class FloatingAICopilot(tk.Frame):
         lbl_badge.pack(side=tk.LEFT, padx=4)
 
         # Toggle Expand/Collapse Button
-        btn_toggle_text = "[-]" if self.is_expanded else "[+]"
+        btn_toggle_text = "Collapse" if self.is_expanded else "Expand"
         self.btn_toggle = tk.Button(
             self.header,
             text=btn_toggle_text,
@@ -256,7 +256,7 @@ class FloatingAICopilot(tk.Frame):
         if not prompt:
             return
 
-        self.append_log(f"> {prompt}")
+        self.append_log(f"Command: {prompt}")
 
         # Plan & Preview
         plan = self.agent.plan_prompt(prompt)
@@ -266,9 +266,9 @@ class FloatingAICopilot(tk.Frame):
         # Execute
         result = self.agent.execute_prompt(prompt)
         if result.success:
-            self.append_log(f"✓ {result.explanation}")
+            self.append_log(f"Success: {result.explanation}")
         else:
-            self.append_log(f"⚠️ {result.error_message}")
+            self.append_log(f"Error: {result.error_message}")
 
         if self.on_prompt_executed:
             self.on_prompt_executed(result)
