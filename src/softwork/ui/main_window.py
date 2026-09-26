@@ -126,7 +126,20 @@ class MainWindow(tk.Tk):
         toolbar.pack(side=tk.TOP, fill=tk.X)
 
         btn_sk = ttk.Button(toolbar, text="✏️ New Sketch", command=lambda: self._action_create_sketch("XY"))
-        btn_sk.pack(side=tk.LEFT, padx=3)
+        btn_sk.pack(side=tk.LEFT, padx=2)
+
+        # Drawing Mode Selector
+        btn_mode_sel = ttk.Button(toolbar, text="👆 Select", command=lambda: self._set_draw_mode("SELECT"))
+        btn_mode_sel.pack(side=tk.LEFT, padx=2)
+
+        btn_draw_rect = ttk.Button(toolbar, text="▭ Rect", command=lambda: self._set_draw_mode("DRAW_RECTANGLE"))
+        btn_draw_rect.pack(side=tk.LEFT, padx=2)
+
+        btn_draw_circ = ttk.Button(toolbar, text="⭕ Circle", command=lambda: self._set_draw_mode("DRAW_CIRCLE"))
+        btn_draw_circ.pack(side=tk.LEFT, padx=2)
+
+        btn_draw_line = ttk.Button(toolbar, text="╱ Line", command=lambda: self._set_draw_mode("DRAW_LINE"))
+        btn_draw_line.pack(side=tk.LEFT, padx=2)
 
         btn_ext = ttk.Button(toolbar, text="⬆️ Extrude", command=self._action_extrude_sketch)
         btn_ext.pack(side=tk.LEFT, padx=3)
@@ -170,11 +183,15 @@ class MainWindow(tk.Tk):
         self.tree.pack(fill=tk.BOTH, expand=True)
         self.tree.bind("<<TreeviewSelect>>", self._on_tree_select)
 
-        # Center: 3D Viewport with face raycasting callback
+        # Center: 3D Viewport with face raycasting and interactive drawing callbacks
         center_frame = tk.Frame(main_pane, bg="#0F172A")
         main_pane.add(center_frame, width=720)
 
-        self.viewport = CAD3DCanvas(center_frame, on_face_selected=self._on_face_picked)
+        self.viewport = CAD3DCanvas(
+            center_frame,
+            on_face_selected=self._on_face_picked,
+            on_shape_drawn=self._on_viewport_shape_drawn,
+        )
         self.viewport.pack(fill=tk.BOTH, expand=True)
 
         # Right Panel: Properties Inspector
@@ -183,6 +200,54 @@ class MainWindow(tk.Tk):
 
         self.props_container = tk.Frame(right_frame, bg="#0F172A")
         self.props_container.pack(fill=tk.BOTH, expand=True)
+
+    def _set_draw_mode(self, mode: str) -> None:
+        # Find active sketch plane
+        active_plane = None
+        for f in reversed(self.document.active_part.features):
+            if isinstance(f, SketchFeature):
+                active_plane = f.sketch.plane
+                break
+        self.viewport.set_tool_mode(mode, active_plane=active_plane)
+        mode_label = mode.replace("DRAW_", "").title() if mode != "SELECT" else "Select / Orbit"
+        self.status_bar.config(text=f"🎯 Tool Mode: {mode_label} | Click & Drag on 3D Viewport to sketch", fg="#38BDF8")
+
+    def _on_viewport_shape_drawn(self, shape_type: str, data: Dict[str, Any]) -> None:
+        sk_feat = None
+        for f in reversed(self.document.active_part.features):
+            if isinstance(f, SketchFeature):
+                sk_feat = f
+                break
+        if not sk_feat:
+            self._action_create_sketch("XY")
+            sk_feat = self.document.active_part.features[-1]
+
+        if isinstance(sk_feat, SketchFeature):
+            if shape_type == "rectangle":
+                sk_feat.sketch.add_rectangle(
+                    width=data["width"],
+                    height=data["height"],
+                    center_u=data.get("center_u", 0.0),
+                    center_v=data.get("center_v", 0.0),
+                    centered=data.get("centered", True),
+                )
+            elif shape_type == "circle":
+                sk_feat.sketch.add_circle(
+                    radius=data["radius"],
+                    center_u=data.get("center_u", 0.0),
+                    center_v=data.get("center_v", 0.0),
+                )
+            elif shape_type == "line":
+                sk_feat.sketch.add_line(
+                    start_u=data["start_u"],
+                    start_v=data["start_v"],
+                    end_u=data["end_u"],
+                    end_v=data["end_v"],
+                )
+
+            self.document.recompute()
+            self._refresh_all()
+            self.status_bar.config(text=f"✏️ Added {shape_type.title()} to {sk_feat.name}", fg="#10B981")
 
     def _build_ai_command_bar(self) -> None:
         ai_frame = tk.Frame(self, bg="#1E293B", padx=10, pady=8)
@@ -276,7 +341,8 @@ class MainWindow(tk.Tk):
             tk.Label(self.props_container, text=f"Plane: {feature.sketch.plane.plane_type.value}", bg="#0F172A", fg="#E2E8F0").pack(anchor=tk.W, pady=4)
             num_prof = len(feature.sketch.profiles)
             num_el = len(feature.sketch.elements)
-            tk.Label(self.props_container, text=f"Elements: {num_el} | Profiles: {num_prof} closed loop(s)", bg="#0F172A", fg="#10B981").pack(anchor=tk.W, pady=2)
+            num_c = len(feature.sketch.constraints)
+            tk.Label(self.props_container, text=f"Elements: {num_el} | Loops: {num_prof} | Constraints: {num_c}", bg="#0F172A", fg="#10B981").pack(anchor=tk.W, pady=2)
             
             btn_frame = tk.Frame(self.props_container, bg="#0F172A")
             btn_frame.pack(fill=tk.X, pady=6)
@@ -284,6 +350,10 @@ class MainWindow(tk.Tk):
             btn_add_rect.pack(fill=tk.X, pady=2)
             btn_add_circ = ttk.Button(btn_frame, text="➕ R15 Circle", command=lambda: self._add_circ_to_sketch(feature, 15.0))
             btn_add_circ.pack(fill=tk.X, pady=2)
+
+            btn_solve = ttk.Button(btn_frame, text="📐 Solve Constraints (DOF)", command=lambda: self._solve_sketch_constraints(feature))
+            btn_solve.pack(fill=tk.X, pady=2)
+
             btn_ext = ttk.Button(btn_frame, text="🚀 Extrude This Sketch", style="Accent.TButton", command=self._action_extrude_sketch)
             btn_ext.pack(fill=tk.X, pady=4)
             return
@@ -305,6 +375,13 @@ class MainWindow(tk.Tk):
 
             btn = ttk.Button(row, text="Apply", width=6, command=make_handler(feature.id, param_name, entry))
             btn.pack(side=tk.RIGHT, padx=2)
+
+    def _solve_sketch_constraints(self, sk_feat: SketchFeature) -> None:
+        report = sk_feat.sketch.solve()
+        self.document.recompute()
+        self._refresh_all()
+        status_msg = f"✓ Solver Converged ({report.iterations} iters) | DOF: {report.degrees_of_freedom}" if report.is_converged else f"⚠️ Unresolved: {', '.join(report.unresolved_constraints)}"
+        messagebox.showinfo("2D Constraint Solver Report", status_msg)
 
     def _add_rect_to_sketch(self, sk_feat: SketchFeature, w: float = 50.0, h: float = 30.0) -> None:
         sk_feat.sketch.add_rectangle(w, h, centered=True)
