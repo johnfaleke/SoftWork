@@ -42,8 +42,9 @@ class CAD3DCanvas(tk.Canvas):
         self._is_panning: bool = False
         self._drag_dist: float = 0.0
 
-        # Current mesh to render & selected face index
+        # Current mesh and sketches to render
         self._mesh: Optional[MeshData] = None
+        self._sketches: List[Any] = []
         self._solid_color: str = "#38BDF8"  # Precision CAD cyan/blue
         self.selected_face_idx: Optional[int] = None
         self._rendered_faces: List[Tuple[int, List[Tuple[float, float]], Tuple[float, float, float]]] = []
@@ -61,6 +62,10 @@ class CAD3DCanvas(tk.Canvas):
         self._mesh = mesh
         self._solid_color = color
         self.selected_face_idx = None
+        self.render()
+
+    def set_sketches(self, sketches: List[Any]) -> None:
+        self._sketches = sketches or []
         self.render()
 
     def reset_view(self) -> None:
@@ -252,7 +257,52 @@ class CAD3DCanvas(tk.Canvas):
                     v1 = projected_verts[edge[1]]
                     self.create_line(v0[0], v0[1], v1[0], v1[1], fill="#38BDF8", width=1.5)
 
-        # 3. Coordinate Axes
+        # 3. Render 2D Sketches in 3D Space
+        for sketch in self._sketches:
+            plane = getattr(sketch, "plane", None)
+            if not plane:
+                continue
+
+            # Draw sketch plane boundary box
+            ps_box = [(-60.0, -40.0), (60.0, -40.0), (60.0, 40.0), (-60.0, 40.0)]
+            p3_box = [plane.to_3d(u, v, 0.0) for u, v in ps_box]
+            proj_box = [self._project_point(p.x, p.y, p.z, cx, cy, rad_x, rad_y) for p in p3_box]
+            for bi in range(4):
+                bnxt = (bi + 1) % 4
+                self.create_line(
+                    proj_box[bi][0], proj_box[bi][1], proj_box[bnxt][0], proj_box[bnxt][1],
+                    fill="#475569", width=1, dash=(3, 3)
+                )
+
+            # Draw sketch elements (lines, rectangles, circles, polygons)
+            for el in getattr(sketch, "elements", []):
+                pts_2d = el.sample_points(32)
+                if not pts_2d:
+                    continue
+                p3_list = [plane.to_3d(p.u, p.v, 0.0) for p in pts_2d]
+                proj_pts = [self._project_point(p.x, p.y, p.z, cx, cy, rad_x, rad_y) for p in p3_list]
+
+                # Draw wire loop
+                n_pts = len(proj_pts)
+                is_closed_el = hasattr(el, "width") or hasattr(el, "radius") or (n_pts > 2)
+                for i in range(n_pts if is_closed_el else n_pts - 1):
+                    nxt = (i + 1) % n_pts
+                    self.create_line(
+                        proj_pts[i][0], proj_pts[i][1], proj_pts[nxt][0], proj_pts[nxt][1],
+                        fill="#10B981", width=2.5
+                    )
+
+                # Draw vertex dots
+                for px, py, _ in proj_pts:
+                    self.create_oval(px - 3, py - 3, px + 3, py + 3, fill="#34D399", outline="#065F46", width=1)
+
+            # Draw sketch tag
+            tag_p3 = plane.to_3d(0.0, 0.0, 0.0)
+            tag_proj = self._project_point(tag_p3.x, tag_p3.y, tag_p3.z, cx, cy, rad_x, rad_y)
+            sk_name = getattr(sketch, "name", "Sketch")
+            self.create_text(tag_proj[0], tag_proj[1] - 12, text=f"✏️ {sk_name}", fill="#10B981", font=("Segoe UI", 9, "bold"))
+
+        # 4. Coordinate Axes
         axis_cx, axis_cy = 60, h - 60
         axis_len = 35.0
         axes = [
