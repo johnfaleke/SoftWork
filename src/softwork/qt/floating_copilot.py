@@ -1,8 +1,8 @@
 """
-Modern Draggable & Collapsible Floating AI Copilot Widget for SoftWork Qt6 CAD IDE.
+Clean CAD HUD Parametric Copilot Widget for SoftWork (PTC Creo & SolidWorks aesthetic).
 """
 from __future__ import annotations
-from typing import Optional, Callable
+from typing import Optional
 
 from softwork.ai.agent import CADAgent, AgentPlan, AgentExecutionResult
 
@@ -17,7 +17,6 @@ try:
         QLineEdit,
         QPushButton,
         QTextEdit,
-        QScrollArea,
     )
     from PySide6.QtGui import QMouseEvent, QFont, QColor
 except ImportError:
@@ -26,7 +25,7 @@ except ImportError:
 
 class QtFloatingCopilot(QFrame):
     """
-    Floating HUD AI Copilot widget that can be dragged freely over the 3D viewport canvas.
+    Floating CAD Engineering HUD Copilot widget overlaid on the 3D viewport canvas.
     """
     planPreviewRequested = Signal(object)
     promptExecuted = Signal(object)
@@ -38,136 +37,144 @@ class QtFloatingCopilot(QFrame):
         self._dragging: bool = False
         self._drag_pos = QPoint()
 
-        self.setFixedWidth(340)
+        self.setFixedWidth(360)
         self.setStyleSheet("""
             QFrame#CopilotFrame {
-                background-color: #121212;
-                border: 1px solid #282828;
-                border-radius: 10px;
+                background-color: #21252B;
+                border: 1px solid #3E4451;
+                border-radius: 4px;
             }
             QLabel#CopilotHeader {
-                color: #FFFFFF;
-                font-weight: bold;
-                font-size: 12px;
+                color: #DCE1E8;
+                font-family: "Segoe UI", "Tahoma", sans-serif;
+                font-weight: 700;
+                font-size: 11px;
+                letter-spacing: 0.5px;
             }
             QLabel#CopilotBadge {
-                background-color: #1F1F1F;
-                color: #00F0FF;
-                border: 1px solid #00F0FF;
-                border-radius: 4px;
-                padding: 1px 4px;
-                font-size: 10px;
-                font-weight: bold;
+                background-color: #1E2227;
+                color: #00A8FF;
+                border: 1px solid #007ACC;
+                border-radius: 2px;
+                padding: 1px 5px;
+                font-size: 9px;
+                font-weight: 600;
             }
             QTextEdit#CopilotLog {
-                background-color: #0A0A0A;
-                color: #E2E8F0;
-                border: 1px solid #1E1E1E;
-                border-radius: 6px;
-                font-family: "Consolas", monospace;
-                font-size: 11px;
-                padding: 6px;
+                background-color: #181A1F;
+                color: #DCE1E8;
+                border: 1px solid #2C313A;
+                border-radius: 2px;
+                font-family: "Consolas", "Courier New", monospace;
+                font-size: 10px;
+                padding: 4px;
             }
             QPushButton#ChipButton {
-                background-color: #1E1E1E;
-                color: #00F0FF;
-                border: 1px solid #2A2A2A;
-                border-radius: 10px;
-                padding: 3px 8px;
-                font-size: 10px;
-                font-weight: bold;
+                background-color: #282C34;
+                color: #DCE1E8;
+                border: 1px solid #3E4451;
+                border-radius: 2px;
+                padding: 2px 6px;
+                font-size: 9px;
+                font-weight: 600;
             }
             QPushButton#ChipButton:hover {
-                background-color: #00F0FF;
-                color: #000000;
+                background-color: #007ACC;
+                color: #FFFFFF;
+                border-color: #00A8FF;
             }
             QLineEdit#PromptInput {
-                background-color: #181818;
-                color: #FFFFFF;
-                border: 1px solid #2E2E2E;
-                border-radius: 6px;
-                padding: 6px 8px;
-                font-size: 12px;
+                background-color: #181A1F;
+                color: #DCE1E8;
+                border: 1px solid #3E4451;
+                border-radius: 2px;
+                padding: 5px 6px;
+                font-size: 11px;
+                font-family: "Segoe UI", "Tahoma", sans-serif;
             }
             QLineEdit#PromptInput:focus {
-                border-color: #00F0FF;
+                border-color: #00A8FF;
             }
             QPushButton#SendButton {
-                background-color: #00F0FF;
-                color: #000000;
-                border: none;
-                border-radius: 6px;
-                font-weight: bold;
-                padding: 6px 12px;
+                background-color: #007ACC;
+                color: #FFFFFF;
+                border: 1px solid #00A8FF;
+                border-radius: 2px;
+                font-weight: 600;
+                font-size: 11px;
+                padding: 4px 10px;
             }
             QPushButton#SendButton:hover {
-                background-color: #33F3FF;
+                background-color: #0088DD;
+            }
+            QPushButton#SendButton:pressed {
+                background-color: #0060A0;
             }
             QPushButton#ToggleBtn {
                 background: transparent;
-                color: #888888;
-                border: none;
-                font-size: 11px;
+                color: #8B949E;
+                border: 1px solid #3E4451;
+                border-radius: 2px;
+                font-size: 9px;
+                font-weight: bold;
+                padding: 1px;
             }
             QPushButton#ToggleBtn:hover {
                 color: #FFFFFF;
+                background-color: #282C34;
             }
         """)
         self.setObjectName("CopilotFrame")
         self._build_ui()
 
     def _build_ui(self) -> None:
-        # Clear existing layout
         if self.layout() is not None:
             QWidget().setLayout(self.layout())
 
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(10, 8, 10, 10)
-        main_layout.setSpacing(6)
+        main_layout.setContentsMargins(8, 6, 8, 8)
+        main_layout.setSpacing(5)
 
         # Header (Draggable Handle)
         header_layout = QHBoxLayout()
         header_layout.setSpacing(6)
 
-        lbl_icon = QLabel("✨")
-        lbl_icon.setStyleSheet("font-size: 13px;")
-        header_layout.addWidget(lbl_icon)
-
-        lbl_title = QLabel("SoftWork Copilot")
+        lbl_title = QLabel("PARAMETRIC COPILOT")
         lbl_title.setObjectName("CopilotHeader")
         header_layout.addWidget(lbl_title)
 
         prov_name = type(self.agent.provider).__name__.replace("Provider", "")
-        lbl_badge = QLabel(prov_name)
+        lbl_badge = QLabel(f"[{prov_name}]")
         lbl_badge.setObjectName("CopilotBadge")
         header_layout.addWidget(lbl_badge)
 
         header_layout.addStretch()
 
-        self.btn_toggle = QPushButton("▼" if self.is_expanded else "▲")
+        self.btn_toggle = QPushButton("[-]" if self.is_expanded else "[+]")
         self.btn_toggle.setObjectName("ToggleBtn")
-        self.btn_toggle.setFixedSize(20, 20)
+        self.btn_toggle.setFixedSize(22, 18)
         self.btn_toggle.clicked.connect(self.toggle_expanded)
         header_layout.addWidget(self.btn_toggle)
 
         main_layout.addLayout(header_layout)
 
         if self.is_expanded:
-            # Multi-line Chat Log
+            # Multi-line Command Log
             self.txt_log = QTextEdit()
             self.txt_log.setObjectName("CopilotLog")
             self.txt_log.setReadOnly(True)
-            self.txt_log.setFixedHeight(120)
-            self.txt_log.append("🤖 AI Copilot Online.\nAsk to create solids, sketches, holes, or shell geometry.")
+            self.txt_log.setFixedHeight(110)
+            self.txt_log.append("[SYSTEM] Parametric Copilot Online.")
+            self.txt_log.append("[INFO] Ready for CAD commands, dimension modifications, and feature creation.")
             main_layout.addWidget(self.txt_log)
 
-            # Suggestion Chips
+            # Quick Prompt Chips
             chips_layout = QHBoxLayout()
             chips_layout.setSpacing(4)
             for label, prompt in [
-                ("➕ Plate", "Create a 100 x 60 x 10 mm mounting plate"),
-                ("🔩 M8 Holes", "Add four M8 holes, 10 mm from each corner"),
-                ("🐚 Shell", "Add a 2 mm shell"),
+                ("Plate 100x60", "Create a 100 x 60 x 10 mm mounting plate"),
+                ("M8 Holes", "Add four M8 holes, 10 mm from each corner"),
+                ("2mm Shell", "Add a 2 mm shell"),
             ]:
                 chip_btn = QPushButton(label)
                 chip_btn.setObjectName("ChipButton")
@@ -178,15 +185,15 @@ class QtFloatingCopilot(QFrame):
 
         # Input row
         input_layout = QHBoxLayout()
-        input_layout.setSpacing(6)
+        input_layout.setSpacing(4)
 
         self.inp_prompt = QLineEdit()
         self.inp_prompt.setObjectName("PromptInput")
-        self.inp_prompt.setPlaceholderText("Ask AI to model or modify...")
+        self.inp_prompt.setPlaceholderText("Enter CAD instruction or parameter...")
         self.inp_prompt.returnPressed.connect(self.submit_prompt)
         input_layout.addWidget(self.inp_prompt)
 
-        btn_send = QPushButton("➔")
+        btn_send = QPushButton("Execute")
         btn_send.setObjectName("SendButton")
         btn_send.clicked.connect(self.submit_prompt)
         input_layout.addWidget(btn_send)
@@ -219,9 +226,9 @@ class QtFloatingCopilot(QFrame):
         result = self.agent.execute_prompt(prompt)
         if hasattr(self, "txt_log") and self.is_expanded:
             if result.success:
-                self.txt_log.append(f"✓ {result.explanation}")
+                self.txt_log.append(f"[OK] {result.explanation}")
             else:
-                self.txt_log.append(f"⚠️ {result.error_message}")
+                self.txt_log.append(f"[ERROR] {result.error_message}")
 
         self.promptExecuted.emit(result)
 
