@@ -11,12 +11,12 @@
 - **v0.3 — AI CAD Copilot & Advanced Features** *(✅ Completed)*: Live cloud LLM providers (Gemini, Claude, OpenAI), visual AI ghost mesh preview & HUD volume delta, ISO Hole Wizard (M3-M16 Counterbore/Countersink), Shell/Hollow feature.
 - **Modern IDE Architecture & UI Customization** *(✅ Completed)*: Vertical Activity Bar, **Draggable & Collapsible Floating AI Copilot HUD**, breadcrumb navigation, theme engine with 8 presets (OLED True Black, Charcoal, Studio Light, Nordic Frost, Cyberpunk Neon, Industrial Titanium, Forest Sage, Solarized Dark), persistent workspace settings (`~/.softwork/workspace_settings.json`).
 - **PySide6 / Qt6 Modern CAD IDE Frontend (SolidWorks & PTC Creo Architecture)** *(✅ Completed)*:
-  - **No Emojis Anywhere**: 100% clean industrial engineering aesthetic with zero emojis in ribbons, trees, dialogs, viewport HUD, or status bars.
+  - **Pure Text Only Everywhere**: 100% clean industrial engineering aesthetic with zero icons, symbols, emojis, or cryptic glyphs anywhere in the interface (ribbons, trees, dialogs, viewport HUD, activity bar, floating copilot, or status bars).
   - **CommandManager Ribbon (Top)**: Tabbed toolbars (`Features`, `Sketch`, `Evaluate`, `Parametric Copilot`, `I/O & History`).
-  - **FeatureManager Design Tree (Left)**: Real CAD hierarchy with standard datum planes (`Front Plane`, `Top Plane`, `Right Plane`, `Origin`), parametric features, and under-defined sketch sub-nodes.
-  - **SolidWorks Studio Gradient Viewport**: Smooth vertical gradient (`#2A2D34` to `#181A1F`), metallic diffuse shaded surfaces, crisp silhouette edges (`#181A1F`), high-contrast cyan face selection (`#00A8FF`), centered **Heads-Up View Toolbar** (`[Fit]`, `[Iso]`, `[Top]`, `[Front]`, `[Right]`, `[Sect]`, `[Style]`), and bottom-left 3D coordinate triad with datum origin.
-  - **Parametric Copilot HUD**: Clean engineering command prompt & NLP execution overlay with live provider badges, parameter log, and ghost geometry wireframes.
-  - **Engineering Status Bar**: `Editing Part` | `Cursor: X, Y, Z` | `Units: MMGS` | `Rebuilt: Clean`.
+  - **FeatureManager Design Tree (Left)**: Real CAD hierarchy with standard datum planes (`Front Plane`, `Top Plane`, `Right Plane`, `Origin`), parametric features, material assignments, and sketch profiles.
+  - **SolidWorks Studio Gradient Viewport**: Smooth vertical gradient, metallic diffuse shaded surfaces, crisp silhouette edges, high-contrast cyan face selection (`#00A8FF`), centered **Heads-Up View Toolbar** (`Zoom Fit`, `Isometric`, `Top View`, `Front View`, `Right View`, `Normal To`, `Section`), and bottom-left 3D coordinate triad with datum origin.
+  - **Parametric Copilot HUD**: Clean engineering command prompt & NLP execution overlay with clear text badges (`GEMINI`, `HEURISTIC`), parameter log, and ghost geometry wireframes.
+  - **Engineering Status Bar**: `Editing Part` | `Cursor: X, Y, Z` | `Units: MMGS` | `Rebuilt Clean`.
 - **v0.4 — AI-Native Parametric Editing & Semantic References** *(✅ Completed)*:
   - **In-Place Parametric Mutation Engine (`ParametricModifier`)**: Translates NLP modification prompts (*"make the plate 15 mm thick"*, *"change holes from M8 to M10"*, *"increase fillet to 4 mm"*, *"change shell thickness to 3 mm"*) into deterministic parameter commands rather than re-creating duplicate shapes.
   - **Batch Multi-Parameter Transactions (`BatchSetParameterCommand`)**: Atomic simultaneous dimension resizing (*"resize width to 80 and length to 120"*) in a single undoable transaction.
