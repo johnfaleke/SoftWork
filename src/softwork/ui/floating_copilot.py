@@ -63,12 +63,9 @@ class FloatingAICopilot(tk.Frame):
         self.header = tk.Frame(self, bg=th.bg_panel, height=28, cursor="fleur", padx=8, pady=4)
         self.header.pack(fill=tk.X)
 
-        lbl_icon = tk.Label(self.header, text="✨", bg=th.bg_panel, fg=th.fg_accent, font=("Segoe UI", 10))
-        lbl_icon.pack(side=tk.LEFT)
-
         self.lbl_title = tk.Label(
             self.header,
-            text="SoftWork Copilot",
+            text="PARAMETRIC COPILOT",
             bg=th.bg_panel,
             fg=th.fg_primary,
             font=("Segoe UI", 9, "bold"),
@@ -80,7 +77,7 @@ class FloatingAICopilot(tk.Frame):
         prov_name = type(self.agent.provider).__name__.replace("Provider", "")
         lbl_badge = tk.Label(
             self.header,
-            text=prov_name,
+            text=f"[{prov_name}]",
             bg=th.bg_hover,
             fg=th.fg_accent,
             font=("Segoe UI", 7, "bold"),
@@ -90,7 +87,7 @@ class FloatingAICopilot(tk.Frame):
         lbl_badge.pack(side=tk.LEFT, padx=4)
 
         # Toggle Expand/Collapse Button
-        btn_toggle_text = "▼" if self.is_expanded else "▲"
+        btn_toggle_text = "[-]" if self.is_expanded else "[+]"
         self.btn_toggle = tk.Button(
             self.header,
             text=btn_toggle_text,
@@ -100,13 +97,13 @@ class FloatingAICopilot(tk.Frame):
             activeforeground=th.fg_primary,
             bd=0,
             padx=4,
-            font=("Segoe UI", 8),
+            font=("Segoe UI", 8, "bold"),
             command=self.toggle_expanded,
         )
         self.btn_toggle.pack(side=tk.RIGHT)
 
         # Bind drag events to header and title
-        for w in (self.header, self.lbl_title, lbl_icon):
+        for w in (self.header, self.lbl_title):
             w.bind("<ButtonPress-1>", self._on_drag_start)
             w.bind("<B1-Motion>", self._on_drag_motion)
 
@@ -138,7 +135,7 @@ class FloatingAICopilot(tk.Frame):
 
         btn_send = tk.Button(
             input_frame,
-            text="➔",
+            text="Run",
             bg=th.accent_btn_bg,
             fg=th.accent_btn_fg,
             activebackground=th.accent_btn_hover,
@@ -171,14 +168,14 @@ class FloatingAICopilot(tk.Frame):
             height=8,
         )
         self.txt_log.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        self.txt_log.insert(tk.END, "🤖 SoftWork AI Copilot Online.\nAsk to sketch, extrude, cut holes, or shell geometry.\n\n")
+        self.txt_log.insert(tk.END, "[SYSTEM] Parametric Copilot Online.\n[INFO] Enter natural language or parameter instructions.\n\n")
         self.txt_log.config(state=tk.DISABLED)
 
         # Quick Suggestion Chips
         chips_frame = tk.Frame(body, bg=th.bg_card)
         chips_frame.pack(fill=tk.X, pady=(0, 6))
 
-        chips = ["➕ Plate 100x60", "🔩 4x M8 Holes", "🐚 Shell 2mm", "⬆️ Extrude 30mm"]
+        chips = ["Plate 100x60", "4x M8 Holes", "Shell 2mm", "Extrude 30mm"]
         for chip in chips:
             btn_chip = tk.Button(
                 chips_frame,
@@ -214,7 +211,7 @@ class FloatingAICopilot(tk.Frame):
 
         btn_send = tk.Button(
             input_frame,
-            text="Send",
+            text="Execute",
             bg=th.accent_btn_bg,
             fg=th.accent_btn_fg,
             activebackground=th.accent_btn_hover,
@@ -227,7 +224,7 @@ class FloatingAICopilot(tk.Frame):
         btn_send.pack(side=tk.RIGHT)
 
     def _use_chip_prompt(self, chip_text: str) -> None:
-        clean = chip_text.replace("➕ ", "Create ").replace("🔩 ", "Add ").replace("🐚 ", "Add ").replace("⬆️ ", "")
+        clean = f"Create {chip_text}"
         self.entry_prompt.delete(0, tk.END)
         self.entry_prompt.insert(0, clean)
         self.submit_prompt()

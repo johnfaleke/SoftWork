@@ -52,9 +52,9 @@ class ActivityBar(tk.Frame):
         top_group.pack(side=tk.TOP, fill=tk.X, pady=(6, 0))
 
         tabs = [
-            ("tree", "📁", "Model Tree & Features"),
-            ("tools", "🛠️", "CAD Modeling Tools"),
-            ("props", "📊", "Feature Properties"),
+            ("tree", "Tree", "FeatureManager Design Tree"),
+            ("tools", "Feat", "Parametric Features & Tools"),
+            ("props", "Prop", "Properties Inspector"),
         ]
 
         self.btn_map: Dict[str, tk.Button] = {}
@@ -68,9 +68,9 @@ class ActivityBar(tk.Frame):
                 fg=th.fg_accent if is_active else th.fg_secondary,
                 activebackground=th.bg_hover,
                 activeforeground=th.fg_accent,
-                font=("Segoe UI", 12),
+                font=("Segoe UI", 9, "bold"),
                 bd=0,
-                width=3,
+                width=4,
                 height=1,
                 cursor="hand2",
                 command=lambda t=tab_id: self._select_tab(t),
@@ -84,14 +84,14 @@ class ActivityBar(tk.Frame):
 
         btn_ai = tk.Button(
             bottom_group,
-            text="✨",
+            text="AI",
             bg=th.bg_app,
             fg=th.fg_accent,
             activebackground=th.bg_hover,
             activeforeground=th.fg_accent,
-            font=("Segoe UI", 12),
+            font=("Segoe UI", 9, "bold"),
             bd=0,
-            width=3,
+            width=4,
             height=1,
             cursor="hand2",
             command=self._on_ai_click,
@@ -100,14 +100,14 @@ class ActivityBar(tk.Frame):
 
         btn_settings = tk.Button(
             bottom_group,
-            text="⚙️",
+            text="Cfg",
             bg=th.bg_app,
             fg=th.fg_secondary,
             activebackground=th.bg_hover,
             activeforeground=th.fg_primary,
-            font=("Segoe UI", 12),
+            font=("Segoe UI", 9, "bold"),
             bd=0,
-            width=3,
+            width=4,
             height=1,
             cursor="hand2",
             command=self._on_settings_click,
