@@ -14,6 +14,8 @@ from softwork.commands.feature_commands import (
     ExtrudeSketchCommand,
     RevolveSketchCommand,
     AddPatternCommand,
+    AddHoleWizardCommand,
+    AddShellCommand,
 )
 from softwork.commands.parameter_commands import SetParameterCommand
 from softwork.core.document import Document
@@ -216,7 +218,57 @@ class ToolRegistry:
             ).execute(self.document),
         )
 
-        # 10. Parameter modification
+        # 10. Feature Hole Wizard
+        self.register(
+            name="feature.hole_wizard",
+            description="Add standard ISO metric hole (M3 to M16) with simple or counterbore profile",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "target_feature_id": {"type": "string"},
+                    "metric_size": {"type": "string", "default": "M8"},
+                    "hole_type": {"type": "string", "enum": ["simple", "counterbore", "countersink"], "default": "simple"},
+                    "depth": {"type": "number", "default": 20.0},
+                    "pos_u": {"type": "number", "default": 0.0},
+                    "pos_v": {"type": "number", "default": 0.0},
+                    "name": {"type": "string", "default": "Hole001"},
+                },
+                "required": ["target_feature_id"],
+            },
+            handler=lambda args: AddHoleWizardCommand(
+                target_feature_id=args["target_feature_id"],
+                metric_size=args.get("metric_size", "M8"),
+                hole_type=args.get("hole_type", "simple"),
+                depth=float(args.get("depth", 20.0)),
+                pos_u=float(args.get("pos_u", 0.0)),
+                pos_v=float(args.get("pos_v", 0.0)),
+                name=args.get("name", "Hole001"),
+                provenance="ai",
+            ).execute(self.document),
+        )
+
+        # 11. Feature Shell
+        self.register(
+            name="feature.shell",
+            description="Hollow a solid body leaving uniform wall thickness in mm",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "target_feature_id": {"type": "string"},
+                    "wall_thickness": {"type": "number", "default": 2.0},
+                    "name": {"type": "string", "default": "Shell001"},
+                },
+                "required": ["target_feature_id"],
+            },
+            handler=lambda args: AddShellCommand(
+                target_feature_id=args["target_feature_id"],
+                wall_thickness=float(args.get("wall_thickness", 2.0)),
+                name=args.get("name", "Shell001"),
+                provenance="ai",
+            ).execute(self.document),
+        )
+
+        # 12. Parameter modification
         self.register(
             name="parameter.set",
             description="Modify a parametric dimension on an existing feature while preserving dependencies",
