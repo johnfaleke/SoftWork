@@ -71,7 +71,14 @@ class CADMainWindow(QMainWindow):
         self.setMinimumSize(1040, 660)
 
         # Core Document & Agent
-        self.document = document or Document(name="Part1.softwork")
+        if document is None:
+            from softwork.cad.cadquery_backend import CadQueryBackend
+            from softwork.cad.direct_backend import PrototypeGeometryBackend
+            cq = CadQueryBackend()
+            backend = cq if cq.is_cadquery_available else PrototypeGeometryBackend()
+            self.document = Document(name="Part1.softwork", backend=backend)
+        else:
+            self.document = document
         self.agent = CADAgent(self.document)
         self.document.add_change_listener(self._on_document_changed)
 
@@ -133,6 +140,9 @@ class CADMainWindow(QMainWindow):
         tools_menu.addAction("Sketch on Right Plane (YZ)", lambda: self._action_create_sketch("YZ"))
         tools_menu.addSeparator()
         tools_menu.addAction("Mass Properties & Evaluation", self._action_eval_mass)
+        tools_menu.addSeparator()
+        tools_menu.addAction("CAD Kernel Diagnostics...", self._action_kernel_diagnostics)
+        tools_menu.addAction("Switch CAD Backend (CadQuery / Prototype)...", self._action_switch_backend)
 
         # View
         view_menu = mb.addMenu("View")
@@ -349,6 +359,10 @@ class CADMainWindow(QMainWindow):
         self.lbl_status_coords.setStyleSheet("color: #8B949E; padding-right: 16px;")
         self.status_bar.addWidget(self.lbl_status_coords)
 
+        self.lbl_status_kernel = QLabel("Kernel: Unknown")
+        self.lbl_status_kernel.setStyleSheet("color: #E5C07B; padding-right: 12px; font-weight: 600;")
+        self.status_bar.addPermanentWidget(self.lbl_status_kernel)
+
         self.lbl_status_units = QLabel("MMGS (mm, g, s)")
         self.lbl_status_units.setStyleSheet("color: #DCE1E8; padding-right: 12px; font-weight: 600;")
         self.status_bar.addPermanentWidget(self.lbl_status_units)
@@ -451,6 +465,23 @@ class CADMainWindow(QMainWindow):
         # Update Breadcrumbs
         feat_name = self.document.active_part.features[-1].name if self.document.active_part.features else "Empty"
         self.lbl_breadcrumb.setText(f"{self.document.name} / {self.document.active_part.name} / {feat_name}")
+
+        # Update Kernel & Rebuild Status Indicators
+        caps = self.document.backend_capabilities
+        if caps.kernel_name == "CadQuery / OpenCASCADE":
+            self.lbl_status_kernel.setText("Kernel: CadQuery (B-Rep AP214)")
+            self.lbl_status_kernel.setStyleSheet("color: #98C379; padding-right: 12px; font-weight: 600;")
+        else:
+            self.lbl_status_kernel.setText(f"Kernel: {caps.kernel_name} (Prototype)")
+            self.lbl_status_kernel.setStyleSheet("color: #E5C07B; padding-right: 12px; font-weight: 600;")
+
+        has_failed = any(getattr(f, "status", None) and f.status.value == "failed" for f in self.document.active_part.features)
+        if has_failed:
+            self.lbl_status_rebuild.setText("Rebuild Errors")
+            self.lbl_status_rebuild.setStyleSheet("color: #E06C75; font-weight: 600;")
+        else:
+            self.lbl_status_rebuild.setText("Rebuilt Clean")
+            self.lbl_status_rebuild.setStyleSheet("color: #98C379; font-weight: 600;")
 
         self._refresh_properties()
 
@@ -694,10 +725,50 @@ class CADMainWindow(QMainWindow):
             self._refresh_all()
 
     def _action_new(self) -> None:
-        self.document = Document(name="Part1.softwork")
+        from softwork.cad.cadquery_backend import CadQueryBackend
+        from softwork.cad.direct_backend import PrototypeGeometryBackend
+        cq = CadQueryBackend()
+        backend = cq if cq.is_cadquery_available else PrototypeGeometryBackend()
+        self.document = Document(name="Part1.softwork", backend=backend)
         self.agent = CADAgent(self.document)
         self.document.add_change_listener(self._on_document_changed)
         self._refresh_all()
+
+    def _action_kernel_diagnostics(self) -> None:
+        caps = self.document.backend_capabilities
+        info = (
+            f"CAD Kernel Diagnostics:\n\n"
+            f"Active Backend: {caps.kernel_name}\n"
+            f"Description: {caps.description}\n"
+            f"Authoritative Production Engine: {'Yes' if caps.is_authoritative else 'No (Development Preview)'}\n"
+            f"Exact Analytical B-Rep: {'Yes' if caps.supports_brep else 'No (Faceted Triangulation)'}\n"
+            f"Exact Analytical STEP Export (AP214): {'Supported' if caps.supports_step else 'Blocked (Requires CadQuery/OCP)'}\n"
+            f"STL Mesh Export: {'Supported' if caps.supports_stl else 'No'}\n\n"
+            f"Note: SoftWork enforces strict geometry contracts without silent kernel degradation."
+        )
+        QMessageBox.information(self, "CAD Kernel Diagnostics", info)
+
+    def _action_switch_backend(self) -> None:
+        from softwork.cad.cadquery_backend import CadQueryBackend
+        from softwork.cad.direct_backend import PrototypeGeometryBackend
+
+        is_cq = isinstance(self.document.backend, CadQueryBackend)
+        if is_cq:
+            self.document.backend = PrototypeGeometryBackend()
+            self.document.recompute()
+            self._refresh_all()
+            QMessageBox.information(self, "Backend Switched", "Switched to Prototype Geometry Backend (Faceted preview).")
+        else:
+            try:
+                cq_backend = CadQueryBackend()
+                if not cq_backend.is_cadquery_available:
+                    raise RuntimeError("cadquery / OCP is not installed in the active Python environment.")
+                self.document.backend = cq_backend
+                self.document.recompute()
+                self._refresh_all()
+                QMessageBox.information(self, "Backend Switched", "Switched to CadQuery / OpenCASCADE B-Rep Backend.")
+            except Exception as e:
+                QMessageBox.critical(self, "CadQuery Unavailable", f"Cannot switch to CadQuery backend:\n\n{e}\n\nPlease install cadquery / OCP in your environment.")
 
     def _action_demo_flow(self) -> None:
         self.agent.execute_prompt("Create a 100 x 60 x 10 mm mounting plate")

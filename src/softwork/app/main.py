@@ -26,6 +26,12 @@ def main() -> None:
     if args.file:
         from softwork.document.serializer import load_document
         doc = load_document(args.file)
+    else:
+        from softwork.cad.cadquery_backend import CadQueryBackend
+        from softwork.cad.direct_backend import PrototypeGeometryBackend
+        cq = CadQueryBackend()
+        backend = cq if cq.is_cadquery_available else PrototypeGeometryBackend()
+        doc = Document(name="Part1.softwork", backend=backend)
 
     # 1. Prefer Modern PySide6 / Qt6 CAD IDE
     if not args.legacy_tk:
