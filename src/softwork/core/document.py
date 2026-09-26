@@ -88,41 +88,102 @@ class Document:
     def recompute(self) -> ValidationReport:
         """
         Recomputes all features in dependency topological order and validates generated geometry.
+        Strictly driven by the DependencyGraph DAG:
+        1. Syncs all feature dependencies into the DAG.
+        2. Resolves topological execution order.
+        3. Propagates dirty/failure states down the dependency chain.
+        4. Validates each generated shape with GeometryValidator.
         """
         context_shapes: Dict[str, CADShape] = {}
         report = ValidationReport()
+        failed_nodes: set[str] = set()
 
+        # 1. Sync DAG nodes and dependency edges from all active features
+        all_features: Dict[str, Feature] = {}
         for part in self.parts:
-            # Re-evaluate features
-            last_shape: Optional[CADShape] = None
-            for feature in part.features:
-                if feature.is_suppressed:
-                    continue
-                try:
-                    shape = feature.evaluate(self.backend, context_shapes)
-                    context_shapes[feature.id] = shape
-                    last_shape = shape
-                    
-                    # Validate individual feature shape
-                    feat_report = GeometryValidator.validate_shape(shape, feature.id)
-                    for issue in feat_report.issues:
-                        report.add_issue(
-                            code=issue.code,
-                            message=f"[{feature.name}] {issue.message}",
-                            severity=issue.severity,
-                            target_feature_id=feature.id,
-                            suggested_fix=issue.suggested_fix,
-                        )
-                except Exception as e:
+            for feat in part.features:
+                all_features[feat.id] = feat
+                self.dependency_graph.add_node(feat.id)
+                for dep in feat.dependencies:
+                    self.dependency_graph.add_dependency(feat.id, dep)
+
+        # 2. Get strict topological evaluation order
+        try:
+            topo_order = self.dependency_graph.topological_sort()
+        except ValueError as e:
+            report.add_issue(
+                code="CYCLIC_DEPENDENCY",
+                message=f"Dependency graph error: {str(e)}",
+            )
+            self.latest_validation = report
+            self.notify_changes()
+            return report
+
+        # 3. Evaluate in topological order
+        for feat_id in topo_order:
+            if feat_id not in all_features:
+                continue
+            feature = all_features[feat_id]
+
+            if feature.is_suppressed:
+                feature.status = FeatureStatus.SUPPRESSED
+                continue
+
+            # Check if any parent/dependency failed
+            parent_failed = False
+            for dep in feature.dependencies:
+                if dep in failed_nodes:
                     feature.status = FeatureStatus.FAILED
-                    feature.error_message = str(e)
+                    feature.error_message = f"Dependency '{dep}' failed evaluation"
+                    failed_nodes.add(feat_id)
                     report.add_issue(
-                        code="FEATURE_EVAL_FAILED",
-                        message=f"Evaluation failed on '{feature.name}': {str(e)}",
+                        code="DEPENDENCY_FAILED",
+                        message=f"[{feature.name}] Upstream dependency '{dep}' failed",
                         target_feature_id=feature.id,
                     )
+                    parent_failed = True
+                    break
 
-            part.active_solid = last_shape
+            if parent_failed:
+                continue
+
+            # Evaluate geometry
+            try:
+                shape = feature.evaluate(self.backend, context_shapes)
+                context_shapes[feature.id] = shape
+                feature.status = FeatureStatus.VALID
+                feature.error_message = None
+                feature.generated_shape = shape
+
+                # Validate individual feature shape
+                feat_report = GeometryValidator.validate_shape(shape, feature.id)
+                for issue in feat_report.issues:
+                    report.add_issue(
+                        code=issue.code,
+                        message=f"[{feature.name}] {issue.message}",
+                        severity=issue.severity,
+                        target_feature_id=feature.id,
+                        suggested_fix=issue.suggested_fix,
+                    )
+            except Exception as e:
+                feature.status = FeatureStatus.FAILED
+                feature.error_message = str(e)
+                failed_nodes.add(feat_id)
+                report.add_issue(
+                    code="FEATURE_EVAL_FAILED",
+                    message=f"[{feature.name}] Evaluation failed: {str(e)}",
+                    target_feature_id=feature.id,
+                )
+
+        # 4. Set active solid for each part to the latest valid solid
+        for part in self.parts:
+            last_valid_solid = None
+            for feat_id in topo_order:
+                if feat_id in all_features and any(f.id == feat_id for f in part.features):
+                    f = all_features[feat_id]
+                    if f.status == FeatureStatus.VALID and f.generated_shape and f.generated_shape.volume > 0:
+                        last_valid_solid = f.generated_shape
+            part.active_solid = last_valid_solid
 
         self.latest_validation = report
         self.notify_changes()

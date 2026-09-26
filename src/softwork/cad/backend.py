@@ -11,6 +11,11 @@ from softwork.sketch.profile import SketchProfile
 from softwork.sketch.plane import SketchPlane
 
 
+class CADKernelError(Exception):
+    """Raised when a CAD modeling kernel operation fails."""
+    pass
+
+
 class CADBackend(ABC):
     """
     Abstract interface for geometric kernel operations.

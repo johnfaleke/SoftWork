@@ -84,3 +84,33 @@ class Sketch:
             "elements": [el.to_dict() for el in self.elements],
             "constraints": [c.to_dict() for c in self.constraints if hasattr(c, "to_dict")],
         }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> Sketch:
+        plane_type_str = data.get("plane", {}).get("type", "XY")
+        plane = SketchPlane(StandardPlane(plane_type_str))
+        sketch = cls(id=data.get("id"), name=data.get("name", "Sketch001"), plane=plane)
+
+        for el_data in data.get("elements", []):
+            el_type = el_data.get("type")
+            if el_type == "rectangle":
+                sketch.add_rectangle(
+                    width=el_data.get("width", 100.0),
+                    height=el_data.get("height", 60.0),
+                    center_u=el_data.get("center", [0.0, 0.0])[0],
+                    center_v=el_data.get("center", [0.0, 0.0])[1],
+                    centered=el_data.get("centered", True),
+                )
+            elif el_type == "circle":
+                sketch.add_circle(
+                    radius=el_data.get("radius", 10.0),
+                    center_u=el_data.get("center", [0.0, 0.0])[0],
+                    center_v=el_data.get("center", [0.0, 0.0])[1],
+                )
+            elif el_type == "line":
+                start = el_data.get("start", [0.0, 0.0])
+                end = el_data.get("end", [10.0, 0.0])
+                sketch.add_line(start[0], start[1], end[0], end[1])
+
+        sketch.update_profiles()
+        return sketch

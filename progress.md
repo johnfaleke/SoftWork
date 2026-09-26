@@ -21,7 +21,11 @@
   - **In-Place Parametric Mutation Engine (`ParametricModifier`)**: Translates NLP modification prompts (*"make the plate 15 mm thick"*, *"change holes from M8 to M10"*, *"increase fillet to 4 mm"*, *"change shell thickness to 3 mm"*) into deterministic parameter commands rather than re-creating duplicate shapes.
   - **Batch Multi-Parameter Transactions (`BatchSetParameterCommand`)**: Atomic simultaneous dimension resizing (*"resize width to 80 and length to 120"*) in a single undoable transaction.
   - **Semantic Topological Reference System (`SemanticTopologyMatcher`)**: Persistent topological entity naming (`face:top`, `face:bottom`, `face:hole_inner`, `face:fillet`) solving the CAD topological naming problem across DAG feature recomputations.
-- **v0.5 — Advanced Part Modeling**: Loft, sweep, draft, advanced pattern topologies.
+- **v0.5 — Core Architectural Overhaul & Advanced Modeling (v0.5.0-dev)** *(✅ Core Real DAG Recomputation Complete)*:
+  - **Authoritative CAD Kernel Integration**: Eliminated all silent fallbacks in `CadQueryBackend`; strict `CADKernelError` failure bubbling.
+  - **Strict Topological DAG Recomputation Engine**: `Document.recompute()` evaluates in topological sort order, cascades `FeatureStatus.FAILED` to downstream dependents upon broken parameters or geometry errors, and restores healthy state upon recovery.
+  - **Semantic Feature Decoupling**: Features reference parent entities via semantic string IDs and dynamically resolve geometry from evaluated dependency shapes.
+  - **Canonical Parametric Feature Chain Integration**: Validated end-to-end multi-feature lifecycle (`Sketch` -> `Extrude` -> `Hole` -> `Pattern` -> `Fillet`) under mutations, invalid states, recovery, and serialization.
 - **v0.6 — Assemblies**: Components, mates, interference detection, BOM.
 - **v0.7 — Drawings**: Orthographic views, dimensions, annotations, PDF/DXF export.
 - **v0.8 — AI Engineering Agent**: Multi-step design plans, multimodal inputs, design alternatives, manufacturing awareness.
@@ -40,30 +44,30 @@
 | [`sketch/profile.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/sketch/profile.py) | Closed boundary loop detection & Shoelace polygon area calculation | ✅ Complete |
 | [`sketch/constraints.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/sketch/constraints.py) | 2D geometric constraints (`Coincident`, `Horizontal`, `Vertical`, `Distance`, `Length`, `Radius`, `Fixed`) | ✅ Complete |
 | [`sketch/solver.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/sketch/solver.py) | Gauss-Newton / Levenberg-Marquardt numerical constraint solver with DOF estimation | ✅ Complete |
-| [`sketch/sketch.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/sketch/sketch.py) | 2D Sketch container managing plane, elements, constraints, and profiles | ✅ Complete |
+| [`sketch/sketch.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/sketch/sketch.py) | 2D Sketch container managing plane, elements, constraints, profiles, and JSON serialization | ✅ Complete |
 
-### 2. Parametric Features (`softwork.core.feature`) — *v0.1, v0.2 & v0.3*
+### 2. Parametric Features (`softwork.core.feature`) — *v0.1 - v0.5*
 | Feature Class | Description | Status |
 | :--- | :--- | :--- |
-| `SketchFeature` | First-class 2D sketch entity in the feature tree | ✅ Complete |
-| `ExtrudeFeature` | Extrudes 2D sketch profile by parametric `distance` | ✅ Complete |
+| `SketchFeature` | First-class 2D sketch entity holding 2D profile wires | ✅ Complete |
+| `ExtrudeFeature` | Extrudes 2D sketch profile by parametric `distance` (semantic ID reference) | ✅ Complete |
 | `RevolveFeature` | Revolves 2D sketch profile around axis by parametric `angle` | ✅ Complete |
 | `HoleWizardFeature` | Standard ISO metric holes (M3 to M16) with simple, counterbore, and countersink geometry | ✅ Complete |
 | `ShellFeature` | Uniform wall thickness shelling & hollow cavity generation | ✅ Complete |
 | `PatternFeature` | Linear array repetition of 3D solid features | ✅ Complete |
 | `ChamferFeature` | Edge chamfering with parametric `distance` | ✅ Complete |
-| `MountingPlateFeature` | Multi-hole parametric mounting plate with corner fillets | ✅ Complete |
+| `FilletFeature` | Edge rounding with parametric `radius` | ✅ Complete |
 | `BoxFeature` & `CylinderFeature` | Parametric primitive solids | ✅ Complete |
-| `FilletFeature` | Outer edge rounding with parametric `radius` | ✅ Complete |
+| `MountingPlateFeature` | Legacy monolithic test fixture (retired from canonical workflow) | ✅ Complete |
 
 ### 3. CAD Kernel & Geometry Engine (`softwork.cad`)
 | Module / File | Description | Status |
 | :--- | :--- | :--- |
 | [`cad/geometry.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/cad/geometry.py) | 3D points, vectors, bounding boxes, and triangulated `MeshData` | ✅ Complete |
 | [`cad/topology.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/cad/topology.py) | Topology entity structures and `CADShape` representation | ✅ Complete |
-| [`cad/backend.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/cad/backend.py) | Abstract geometric kernel interface (`CADBackend`) | ✅ Complete |
+| [`cad/backend.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/cad/backend.py) | Abstract geometric kernel interface (`CADBackend`) & `CADKernelError` | ✅ Complete |
 | [`cad/direct_backend.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/cad/direct_backend.py) | Solid kernel with CSG, hole tools, shell cavities, profile extrusions, revolutions, and tessellation | ✅ Complete |
-| [`cad/cadquery_backend.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/cad/cadquery_backend.py) | OpenCASCADE & CadQuery adapter with automatic fallback | ✅ Complete |
+| [`cad/cadquery_backend.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/cad/cadquery_backend.py) | Strict CadQuery & OpenCASCADE adapter raising `CADKernelError` on failure (no silent fallbacks) | ✅ Complete |
 | [`cad/validation.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/cad/validation.py) | `GeometryValidator` (volume, manifold, and boundary checks) | ✅ Complete |
 
 ### 4. Unified Command System (`softwork.commands`)
@@ -71,12 +75,8 @@
 | :--- | :--- | :--- |
 | [`commands/base.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/commands/base.py) | Abstract `Command` interface | ✅ Complete |
 | [`commands/feature_commands.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/commands/feature_commands.py) | `CreateSketchCommand`, `ExtrudeSketchCommand`, `RevolveSketchCommand`, `AddHoleWizardCommand`, `AddShellCommand`, `AddPatternCommand`, `AddChamferCommand`, `CreateBoxCommand`, `CreateMountingPlateCommand`, `AddFilletCommand` | ✅ Complete |
-| [`commands/parameter_commands.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/commands/parameter_commands.py) | `SetParameterCommand` with cascading dependency recalculation | ✅ Complete |
+| [`commands/parameter_commands.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/commands/parameter_commands.py) | `SetParameterCommand` & `BatchSetParameterCommand` with cascading DAG recalculation | ✅ Complete |
 
-### 5. AI Subsystem (`softwork.ai`) — *v0.3*
-| Module / File | Description | Status |
-| :--- | :--- | :--- |
-| [`ai/provider.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/ai/provider.py) | Cloud LLM providers (`GeminiProvider`, `OpenAIProvider`, `AnthropicProvider`) and deterministic Heuristic engine | ✅ Complete |
 ### 5. AI Subsystem (`softwork.ai`) — *v0.3 & v0.4*
 | Module / File | Description | Status |
 | :--- | :--- | :--- |
@@ -107,9 +107,10 @@
 py run_tests.py
 ```
 
-### Test Suites Summary (38 Tests Passing)
+### Test Suites Summary (39 Tests Passing)
 | Test File | Covered Functionality | Result |
 | :--- | :--- | :--- |
+| [`tests/test_real_parametric_chain.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/tests/test_real_parametric_chain.py) | Canonical parametric feature chain (`Sketch` -> `Extrude` -> `Hole` -> `Pattern` -> `Fillet`), parameter mutation, DAG failure cascade, model recovery, and round-trip serialization | ✅ Passed |
 | [`tests/test_v04_ai_parametric_editing.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/tests/test_v04_ai_parametric_editing.py) | In-place parametric thickness/hole/fillet modification, multi-parameter batch dimension edits, and semantic topological reference tagging | ✅ Passed |
 | [`tests/test_core_document.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/tests/test_core_document.py) | Parameter unit conversions (`in`, `mm`, `deg`), DAG recomputation, history undo/redo, Material densities, and mass evaluation | ✅ Passed |
 | [`tests/test_qt_ide_components.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/tests/test_qt_ide_components.py) | PySide6 SolidWorks/Creo QSS tokens, document and CAD agent bindings | ✅ Passed |

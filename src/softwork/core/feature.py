@@ -123,41 +123,67 @@ class SketchFeature(Feature):
 class ExtrudeFeature(Feature):
     """
     Extrudes a parent SketchFeature profile into a 3D solid.
+    Decoupled via semantic ID reference to the parent sketch.
     """
     def __init__(
         self,
-        target_sketch_feature: SketchFeature,
+        target_sketch_feature: SketchFeature | str,
         distance: float = 25.0,
         operation: str = "add",
         name: str = "Extrude001",
         id: Optional[str] = None,
         provenance: str = "user",
     ) -> None:
+        sk_id = target_sketch_feature if isinstance(target_sketch_feature, str) else target_sketch_feature.id
         super().__init__(
             id=id or f"ext_{uuid.uuid4().hex[:8]}",
             name=name,
             feature_type=FeatureType.EXTRUDE,
-            dependencies=[target_sketch_feature.id],
+            dependencies=[sk_id],
             provenance=provenance,
         )
-        self.target_sketch_feature = target_sketch_feature
+        self.sketch_feature_id: str = sk_id
+        self._target_sketch_feature: Optional[SketchFeature] = (
+            target_sketch_feature if isinstance(target_sketch_feature, SketchFeature) else None
+        )
         self.operation = operation
         self.parameters = {
             "distance": Parameter(name="distance", value=distance, unit="mm", description="Extrusion distance / thickness"),
         }
 
-    def evaluate(self, backend: CADBackend, context_shapes: Dict[str, CADShape]) -> CADShape:
-        profile = self.target_sketch_feature.sketch.primary_profile
-        if not profile:
-            raise ValueError(f"Sketch '{self.target_sketch_feature.name}' does not contain any closed profiles to extrude")
+    @property
+    def target_sketch_feature(self) -> Optional[SketchFeature]:
+        return self._target_sketch_feature
 
+    def evaluate(self, backend: CADBackend, context_shapes: Dict[str, CADShape]) -> CADShape:
         dist = self.parameters["distance"].canonical_value
-        shape = backend.extrude_profile(profile, dist, self.target_sketch_feature.sketch.plane)
+        if dist <= 0:
+            raise ValueError(f"Extrude distance must be strictly positive, got {dist} mm")
+
+        # Resolve sketch from context_shapes or direct reference
+        sketch = None
+        plane = None
+        if self.sketch_feature_id in context_shapes:
+            sk_shape = context_shapes[self.sketch_feature_id]
+            sketch = sk_shape.metadata.get("sketch")
+            plane = getattr(sketch, "plane", None)
+        elif self._target_sketch_feature is not None:
+            sketch = self._target_sketch_feature.sketch
+            plane = sketch.plane
+
+        if not sketch:
+            raise ValueError(f"Parent sketch '{self.sketch_feature_id}' not found in evaluated context")
+
+        profile = sketch.primary_profile
+        if not profile:
+            raise ValueError(f"Sketch '{self.sketch_feature_id}' does not contain any closed profiles to extrude")
+
+        shape = backend.extrude_profile(profile, dist, plane)
 
         # Check for prior base solids to combine with
         base_solid = None
         for feat_id, s in context_shapes.items():
-            if feat_id != self.target_sketch_feature.id and s.shape_type != "sketch_wire" and s.volume > 0:
+            if feat_id != self.sketch_feature_id and s.shape_type != "sketch_wire" and s.volume > 0:
                 base_solid = s
 
         if base_solid is not None:
@@ -170,14 +196,21 @@ class ExtrudeFeature(Feature):
         self.status = FeatureStatus.VALID
         return shape
 
+    def to_dict(self) -> Dict[str, Any]:
+        d = super().to_dict()
+        d["sketch_feature_id"] = self.sketch_feature_id
+        d["operation"] = self.operation
+        return d
+
 
 class RevolveFeature(Feature):
     """
     Revolves a parent SketchFeature profile around an axis into an axis-symmetric 3D solid.
+    Decoupled via semantic ID reference to the parent sketch.
     """
     def __init__(
         self,
-        target_sketch_feature: SketchFeature,
+        target_sketch_feature: SketchFeature | str,
         angle_deg: float = 360.0,
         axis: str = "Y",
         operation: str = "add",
@@ -185,31 +218,55 @@ class RevolveFeature(Feature):
         id: Optional[str] = None,
         provenance: str = "user",
     ) -> None:
+        sk_id = target_sketch_feature if isinstance(target_sketch_feature, str) else target_sketch_feature.id
         super().__init__(
             id=id or f"rev_{uuid.uuid4().hex[:8]}",
             name=name,
             feature_type=FeatureType.REVOLVE,
-            dependencies=[target_sketch_feature.id],
+            dependencies=[sk_id],
             provenance=provenance,
         )
-        self.target_sketch_feature = target_sketch_feature
+        self.sketch_feature_id: str = sk_id
+        self._target_sketch_feature: Optional[SketchFeature] = (
+            target_sketch_feature if isinstance(target_sketch_feature, SketchFeature) else None
+        )
         self.axis = axis
         self.operation = operation
         self.parameters = {
             "angle": Parameter(name="angle", value=angle_deg, unit="deg", description="Revolution angle in degrees"),
         }
 
-    def evaluate(self, backend: CADBackend, context_shapes: Dict[str, CADShape]) -> CADShape:
-        profile = self.target_sketch_feature.sketch.primary_profile
-        if not profile:
-            raise ValueError(f"Sketch '{self.target_sketch_feature.name}' has no closed profile to revolve")
+    @property
+    def target_sketch_feature(self) -> Optional[SketchFeature]:
+        return self._target_sketch_feature
 
+    def evaluate(self, backend: CADBackend, context_shapes: Dict[str, CADShape]) -> CADShape:
         angle_deg = self.parameters["angle"].value
-        shape = backend.revolve_profile(profile, angle_deg, axis=self.axis, plane=self.target_sketch_feature.sketch.plane)
+        if angle_deg <= 0 or angle_deg > 360.0:
+            raise ValueError(f"Revolve angle must be in (0, 360], got {angle_deg}")
+
+        sketch = None
+        plane = None
+        if self.sketch_feature_id in context_shapes:
+            sk_shape = context_shapes[self.sketch_feature_id]
+            sketch = sk_shape.metadata.get("sketch")
+            plane = getattr(sketch, "plane", None)
+        elif self._target_sketch_feature is not None:
+            sketch = self._target_sketch_feature.sketch
+            plane = sketch.plane
+
+        if not sketch:
+            raise ValueError(f"Parent sketch '{self.sketch_feature_id}' not found in evaluated context")
+
+        profile = sketch.primary_profile
+        if not profile:
+            raise ValueError(f"Sketch '{self.sketch_feature_id}' has no closed profile to revolve")
+
+        shape = backend.revolve_profile(profile, angle_deg, axis=self.axis, plane=plane)
 
         base_solid = None
         for feat_id, s in context_shapes.items():
-            if feat_id != self.target_sketch_feature.id and s.shape_type != "sketch_wire" and s.volume > 0:
+            if feat_id != self.sketch_feature_id and s.shape_type != "sketch_wire" and s.volume > 0:
                 base_solid = s
 
         if base_solid is not None and self.operation == "add":
@@ -218,6 +275,13 @@ class RevolveFeature(Feature):
         self.generated_shape = shape
         self.status = FeatureStatus.VALID
         return shape
+
+    def to_dict(self) -> Dict[str, Any]:
+        d = super().to_dict()
+        d["sketch_feature_id"] = self.sketch_feature_id
+        d["axis"] = self.axis
+        d["operation"] = self.operation
+        return d
 
 
 class PatternFeature(Feature):
@@ -507,6 +571,13 @@ class HoleWizardFeature(Feature):
         self.generated_shape = shape
         self.status = FeatureStatus.VALID
         return shape
+
+    def to_dict(self) -> Dict[str, Any]:
+        d = super().to_dict()
+        d["target_feature_id"] = self.target_feature_id
+        d["metric_size"] = self.metric_size
+        d["hole_type"] = self.hole_type
+        return d
 
 
 class ShellFeature(Feature):

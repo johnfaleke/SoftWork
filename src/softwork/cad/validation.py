@@ -64,15 +64,16 @@ class GeometryValidator:
         report.metrics["shape_type"] = shape.shape_type
         report.metrics["volume"] = shape.volume
 
-        # 1. Non-negative / positive volume check
-        if shape.volume <= 0.0:
-            report.add_issue(
-                code="ZERO_VOLUME",
-                message=f"Shape '{shape.id}' has zero or negative volume ({shape.volume:.2f} mm³).",
-                severity=ValidationSeverity.ERROR,
-                target_feature_id=feature_id,
-                suggested_fix="Verify positive dimensions and non-degenerate profiles.",
-            )
+        # 1. Non-negative / positive volume check for 3D solids
+        if shape.shape_type != "sketch_wire":
+            if shape.volume <= 0.0:
+                report.add_issue(
+                    code="ZERO_VOLUME",
+                    message=f"Shape '{shape.id}' has zero or negative volume ({shape.volume:.2f} mm3).",
+                    severity=ValidationSeverity.ERROR,
+                    target_feature_id=feature_id,
+                    suggested_fix="Verify positive dimensions and non-degenerate profiles.",
+                )
 
         # 2. Check mesh presence and manifoldness
         mesh: Optional[MeshData] = shape.metadata.get("mesh")

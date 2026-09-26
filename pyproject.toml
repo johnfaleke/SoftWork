@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "softwork"
-version = "0.1.0"
+version = "0.5.0-dev"
 description = "AI-native parametric CAD application"
 readme = "README.md"
 authors = [{ name = "SoftWork Contributors" }]
