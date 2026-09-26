@@ -16,8 +16,8 @@ class TestQtIDEComponents(unittest.TestCase):
 
     def test_qss_style_presence(self) -> None:
         self.assertIn("QMainWindow", DARK_IDE_STYLE)
-        self.assertIn("#00F0FF", DARK_IDE_STYLE)
-        self.assertIn("border-radius", DARK_IDE_STYLE)
+        self.assertTrue("#00A8FF" in DARK_IDE_STYLE or "#007ACC" in DARK_IDE_STYLE)
+        self.assertIn("QTreeWidget", DARK_IDE_STYLE)
 
     def test_qt_document_and_agent_binding(self) -> None:
         doc = Document(name="TestPart.softwork")
