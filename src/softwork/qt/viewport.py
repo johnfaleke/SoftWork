@@ -370,19 +370,19 @@ class CADQtViewport(QWidget):
                 qpoly = QPolygonF([QPoint(int(gv0[0]), int(gv0[1])), QPoint(int(gv1[0]), int(gv1[1])), QPoint(int(gv2[0]), int(gv2[1]))])
                 painter.drawPolygon(qpoly)
 
-            badge_rect = QRect(w - 190, 14, 175, 40)
+            badge_rect = QRect(w - 200, 14, 185, 40)
             painter.setBrush(QBrush(QColor("#21252B")))
             painter.setPen(QPen(QColor("#00A8FF"), 1))
             painter.drawRoundedRect(badge_rect, 3, 3)
 
             painter.setPen(QColor("#00A8FF"))
             painter.setFont(QFont("Segoe UI", 9, QFont.Bold))
-            painter.drawText(w - 180, 28, "AI PROPOSED GEOMETRY")
+            painter.drawText(w - 190, 28, "AI PROPOSED GEOMETRY")
 
-            vol_str = f"{'+' if self._ghost_delta_vol >= 0 else ''}{self._ghost_delta_vol:,.0f} mm³"
+            vol_str = f"{'+' if self._ghost_delta_vol >= 0 else ''}{self._ghost_delta_vol:,.0f} mm3"
             painter.setPen(QColor("#DCE1E8"))
             painter.setFont(QFont("Segoe UI", 8))
-            painter.drawText(w - 180, 44, f"Predicted Δ Vol: {vol_str}")
+            painter.drawText(w - 190, 44, f"Delta Volume: {vol_str}")
 
         # 3. Render 2D Sketches (SolidWorks Blue lines)
         for sketch in self._sketches:
@@ -427,24 +427,24 @@ class CADQtViewport(QWidget):
                 h_mm = abs(v1 - v0)
                 painter.setPen(QColor("#00A8FF"))
                 painter.setFont(QFont("Segoe UI", 9, QFont.Bold))
-                painter.drawText(int(proj_r[2][0] + 10), int(proj_r[2][1] - 6), f"W: {w_mm:.2f} mm  H: {h_mm:.2f} mm")
+                painter.drawText(int(proj_r[2][0] + 10), int(proj_r[2][1] - 6), f"Width: {w_mm:.2f} mm, Height: {h_mm:.2f} mm")
 
         # 4. Heads-Up View Toolbar (Centered Top of Viewport, SolidWorks / Creo style)
         hud_center_x = int(w / 2)
-        hud_btn_w = 42
+        hud_btn_w = 64
         hud_btn_h = 22
         hud_spacing = 3
         total_hud_w = 7 * hud_btn_w + 6 * hud_spacing
         start_hud_x = hud_center_x - int(total_hud_w / 2)
 
         self._hud_buttons = [
-            ("Fit", QRect(start_hud_x, 10, hud_btn_w, hud_btn_h), self.reset_view),
-            ("Iso", QRect(start_hud_x + (hud_btn_w + hud_spacing) * 1, 10, hud_btn_w, hud_btn_h), self.set_view_isometric),
-            ("Top", QRect(start_hud_x + (hud_btn_w + hud_spacing) * 2, 10, hud_btn_w, hud_btn_h), self.set_view_top),
-            ("Front", QRect(start_hud_x + (hud_btn_w + hud_spacing) * 3, 10, hud_btn_w, hud_btn_h), self.set_view_front),
-            ("Right", QRect(start_hud_x + (hud_btn_w + hud_spacing) * 4, 10, hud_btn_w, hud_btn_h), self.set_view_right),
-            ("Norm", QRect(start_hud_x + (hud_btn_w + hud_spacing) * 5, 10, hud_btn_w, hud_btn_h), self.set_view_normal_to_selection),
-            ("Sect", QRect(start_hud_x + (hud_btn_w + hud_spacing) * 6, 10, hud_btn_w, hud_btn_h), lambda: None),
+            ("Zoom Fit", QRect(start_hud_x, 10, hud_btn_w, hud_btn_h), self.reset_view),
+            ("Isometric", QRect(start_hud_x + (hud_btn_w + hud_spacing) * 1, 10, hud_btn_w, hud_btn_h), self.set_view_isometric),
+            ("Top View", QRect(start_hud_x + (hud_btn_w + hud_spacing) * 2, 10, hud_btn_w, hud_btn_h), self.set_view_top),
+            ("Front View", QRect(start_hud_x + (hud_btn_w + hud_spacing) * 3, 10, hud_btn_w, hud_btn_h), self.set_view_front),
+            ("Right View", QRect(start_hud_x + (hud_btn_w + hud_spacing) * 4, 10, hud_btn_w, hud_btn_h), self.set_view_right),
+            ("Normal To", QRect(start_hud_x + (hud_btn_w + hud_spacing) * 5, 10, hud_btn_w, hud_btn_h), self.set_view_normal_to_selection),
+            ("Section", QRect(start_hud_x + (hud_btn_w + hud_spacing) * 6, 10, hud_btn_w, hud_btn_h), lambda: None),
         ]
 
         painter.setFont(QFont("Segoe UI", 8, QFont.Bold))
