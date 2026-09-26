@@ -4,8 +4,11 @@ Unit tests for UI Theme System, Dark/Light Modes, and Custom Workspace Settings.
 from __future__ import annotations
 import unittest
 import tempfile
+import tkinter as tk
 from pathlib import Path
 
+from softwork.ai.agent import CADAgent
+from softwork.core.document import Document
 from softwork.ui.theme import (
     ThemePalette,
     ThemeManager,
@@ -20,6 +23,8 @@ from softwork.ui.theme import (
     SOLARIZED_DARK,
 )
 from softwork.ui.workspace_settings import WorkspaceSettings, WorkspaceSettingsManager
+from softwork.ui.floating_copilot import FloatingAICopilot
+from softwork.ui.activity_bar import ActivityBar
 
 
 class TestUIThemeAndWorkspaceSettings(unittest.TestCase):
@@ -126,6 +131,30 @@ class TestUIThemeAndWorkspaceSettings(unittest.TestCase):
             self.assertEqual(mgr2.settings.default_unit, "cm")
             self.assertEqual(mgr2.settings.grid_step, 10.0)
             self.assertEqual(mgr2.settings.shading_mode, "shaded")
+
+    def test_floating_copilot_and_activity_bar_lifecycle(self) -> None:
+        root = tk.Tk()
+        root.withdraw()
+        try:
+            doc = Document()
+            agent = CADAgent(doc)
+            
+            # Activity Bar test
+            clicked_tab = []
+            act_bar = ActivityBar(root, on_tab_changed=lambda t: clicked_tab.append(t))
+            act_bar._select_tab("tools")
+            self.assertEqual(clicked_tab, ["tools"])
+            self.assertEqual(act_bar.active_tab, "tools")
+
+            # Floating AI Copilot test
+            copilot = FloatingAICopilot(root, agent=agent)
+            self.assertFalse(copilot.is_expanded)
+            copilot.toggle_expanded()
+            self.assertTrue(copilot.is_expanded)
+            copilot.toggle_expanded()
+            self.assertFalse(copilot.is_expanded)
+        finally:
+            root.destroy()
 
 
 if __name__ == "__main__":
