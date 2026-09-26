@@ -106,6 +106,8 @@ class MainWindow(tk.Tk):
         design_menu.add_command(label="Create 2D Sketch (XY)", command=lambda: self._action_create_sketch("XY"))
         design_menu.add_command(label="Extrude Active Sketch", command=self._action_extrude_sketch)
         design_menu.add_command(label="Revolve Active Sketch", command=self._action_revolve_sketch)
+        design_menu.add_command(label="Add Hole Wizard (ISO Metric)", command=self._action_add_hole_wizard)
+        design_menu.add_command(label="Add Shell (Hollow)", command=self._action_add_shell)
         design_menu.add_command(label="Linear Pattern", command=self._action_add_pattern)
         design_menu.add_command(label="Add Chamfer", command=self._action_add_chamfer)
         menubar.add_cascade(label="Design", menu=design_menu)
@@ -115,6 +117,8 @@ class MainWindow(tk.Tk):
         menubar.add_cascade(label="View", menu=view_menu)
 
         ai_menu = tk.Menu(menubar, tearoff=0, bg="#0F172A", fg="#E2E8F0")
+        ai_menu.add_command(label="⚙️ Configure Cloud AI Keys (Gemini / Claude / OpenAI)...", command=self._action_configure_api_keys)
+        ai_menu.add_separator()
         ai_menu.add_command(label="Run MVP Demo Flow (Mounting Plate)", command=self._action_run_demo_flow)
         ai_menu.add_command(label="Run v0.2 Sketch & Extrude Flow", command=self._action_run_sketch_demo)
         menubar.add_cascade(label="AI", menu=ai_menu)
@@ -147,10 +151,16 @@ class MainWindow(tk.Tk):
         btn_rev = ttk.Button(toolbar, text="🔁 Revolve", command=self._action_revolve_sketch)
         btn_rev.pack(side=tk.LEFT, padx=3)
 
+        btn_hole = ttk.Button(toolbar, text="🔩 Hole", command=self._action_add_hole_wizard)
+        btn_hole.pack(side=tk.LEFT, padx=3)
+
+        btn_shell = ttk.Button(toolbar, text="🐚 Shell", command=self._action_add_shell)
+        btn_shell.pack(side=tk.LEFT, padx=3)
+
         btn_box = ttk.Button(toolbar, text="➕ Box", command=self._action_create_box)
         btn_box.pack(side=tk.LEFT, padx=3)
 
-        btn_plate = ttk.Button(toolbar, text="➕ Mounting Plate", command=self._action_create_plate)
+        btn_plate = ttk.Button(toolbar, text="➕ Plate", command=self._action_create_plate)
         btn_plate.pack(side=tk.LEFT, padx=3)
 
         btn_step = ttk.Button(toolbar, text="💾 STEP", command=self._action_export_step)
@@ -412,12 +422,75 @@ class MainWindow(tk.Tk):
         if not prompt:
             return
 
+        # 1. Preview visual ghost in 3D Viewport
+        plan = self.agent.plan_prompt(prompt)
+        if plan.ghost_mesh:
+            self.viewport.set_ghost_mesh(plan.ghost_mesh, delta_vol=plan.predicted_delta_vol)
+
+        # 2. Execute plan
         result = self.agent.execute_prompt(prompt)
         if result.success:
             self.status_bar.config(text=f"✨ AI: {result.explanation}", fg="#38BDF8")
         else:
             self.status_bar.config(text=f"⚠️ AI Error: {result.error_message}", fg="#EF4444")
             messagebox.showwarning("CAD Agent Notice", result.error_message)
+
+        # 3. Refresh and clear ghost preview upon commit
+        self._refresh_all()
+
+    def _action_configure_api_keys(self) -> None:
+        from softwork.ai.provider import HeuristicEngineProvider, GeminiProvider, OpenAIProvider, AnthropicProvider
+        dlg = tk.Toplevel(self)
+        dlg.title("Configure AI Cloud Providers")
+        dlg.geometry("460x280")
+        dlg.configure(bg="#0F172A")
+        dlg.transient(self)
+        dlg.grab_set()
+
+        tk.Label(dlg, text="SoftWork AI Cloud Provider Setup", font=("Segoe UI", 11, "bold"), bg="#0F172A", fg="#38BDF8").pack(pady=10)
+        
+        frame = tk.Frame(dlg, bg="#0F172A", padx=15)
+        frame.pack(fill=tk.BOTH, expand=True)
+
+        tk.Label(frame, text="Active Provider:", bg="#0F172A", fg="#E2E8F0").grid(row=0, column=0, sticky=tk.W, pady=6)
+        prov_var = tk.StringVar(value="Offline Heuristic Engine")
+        combo = ttk.Combobox(frame, textvariable=prov_var, values=["Offline Heuristic Engine", "Google Gemini (1.5 Pro)", "OpenAI (GPT-4o)", "Anthropic (Claude 3.5)"], state="readonly", width=26)
+        combo.grid(row=0, column=1, pady=6)
+
+        tk.Label(frame, text="API Key:", bg="#0F172A", fg="#E2E8F0").grid(row=1, column=0, sticky=tk.W, pady=6)
+        key_entry = tk.Entry(frame, bg="#1E293B", fg="#F8FAFC", insertbackground="#38BDF8", width=28, show="*")
+        key_entry.grid(row=1, column=1, pady=6)
+
+        def apply_provider():
+            chosen = prov_var.get()
+            key = key_entry.get().strip()
+            if "Gemini" in chosen:
+                self.agent.set_provider(GeminiProvider(api_key=key))
+            elif "OpenAI" in chosen:
+                self.agent.set_provider(OpenAIProvider(api_key=key))
+            elif "Anthropic" in chosen:
+                self.agent.set_provider(AnthropicProvider(api_key=key))
+            else:
+                self.agent.set_provider(HeuristicEngineProvider())
+            dlg.destroy()
+            messagebox.showinfo("AI Configured", f"Active AI Provider updated to: {chosen}")
+
+        btn_save = ttk.Button(dlg, text="Save & Activate", style="Accent.TButton", command=apply_provider)
+        btn_save.pack(pady=12)
+
+    def _action_add_hole_wizard(self) -> None:
+        if not self.document.active_part.features:
+            self._action_create_plate()
+        target_feat = self.document.active_part.features[0]
+        AddHoleWizardCommand(target_feature_id=target_feat.id, metric_size="M8", hole_type="counterbore", depth=25.0).execute(self.document)
+        self._refresh_all()
+
+    def _action_add_shell(self) -> None:
+        if not self.document.active_part.features:
+            self._action_create_box()
+        target_feat = self.document.active_part.features[0]
+        AddShellCommand(target_feature_id=target_feat.id, wall_thickness=2.0).execute(self.document)
+        self._refresh_all()
 
     def _action_create_sketch(self, plane: str = "XY") -> None:
         CreateSketchCommand(name=f"Sketch_{plane}", plane_type=StandardPlane(plane)).execute(self.document)
