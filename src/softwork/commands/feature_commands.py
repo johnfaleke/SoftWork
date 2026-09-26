@@ -17,6 +17,8 @@ from softwork.core.feature import (
     ExtrudeFeature,
     RevolveFeature,
     PatternFeature,
+    HoleWizardFeature,
+    ShellFeature,
 )
 from softwork.sketch.sketch import Sketch
 from softwork.sketch.plane import SketchPlane, StandardPlane
@@ -383,6 +385,102 @@ class AddFilletCommand(Command):
 
         do()
         tx.changes.append(TransactionChange(description=f"Added fillet {feature.name}", undo_action=undo, redo_action=do))
+        tx.is_committed = True
+        document.history.push_transaction(tx)
+        return tx
+
+
+class AddHoleWizardCommand(Command):
+    def __init__(
+        self,
+        target_feature_id: str,
+        metric_size: str = "M8",
+        hole_type: str = "simple",
+        depth: float = 20.0,
+        pos_u: float = 0.0,
+        pos_v: float = 0.0,
+        name: str = "Hole001",
+        provenance: str = "user",
+    ) -> None:
+        self.target_feature_id = target_feature_id
+        self.metric_size = metric_size
+        self.hole_type = hole_type
+        self.depth = depth
+        self.pos_u = pos_u
+        self.pos_v = pos_v
+        self.name = name
+        self.provenance = provenance
+
+    def execute(self, document: Document) -> AITransaction:
+        part = document.active_part
+        feature = HoleWizardFeature(
+            target_feature_id=self.target_feature_id,
+            metric_size=self.metric_size,
+            hole_type=self.hole_type,
+            depth=self.depth,
+            pos_u=self.pos_u,
+            pos_v=self.pos_v,
+            name=self.name,
+            provenance=self.provenance,
+        )
+
+        tx = AITransaction(
+            title=f"Add {self.metric_size} {self.hole_type.title()} Hole",
+            affected_features=[feature.id, self.target_feature_id],
+        )
+
+        def do() -> None:
+            document.add_feature(feature, part)
+
+        def undo() -> None:
+            part.remove_feature(feature.id)
+            document.dependency_graph.remove_node(feature.id)
+            document.recompute()
+
+        do()
+        tx.changes.append(TransactionChange(description=f"Added {self.metric_size} hole", undo_action=undo, redo_action=do))
+        tx.is_committed = True
+        document.history.push_transaction(tx)
+        return tx
+
+
+class AddShellCommand(Command):
+    def __init__(
+        self,
+        target_feature_id: str,
+        wall_thickness: float = 2.0,
+        name: str = "Shell001",
+        provenance: str = "user",
+    ) -> None:
+        self.target_feature_id = target_feature_id
+        self.wall_thickness = wall_thickness
+        self.name = name
+        self.provenance = provenance
+
+    def execute(self, document: Document) -> AITransaction:
+        part = document.active_part
+        feature = ShellFeature(
+            target_feature_id=self.target_feature_id,
+            wall_thickness=self.wall_thickness,
+            name=self.name,
+            provenance=self.provenance,
+        )
+
+        tx = AITransaction(
+            title=f"Shell ({self.wall_thickness}mm wall)",
+            affected_features=[feature.id, self.target_feature_id],
+        )
+
+        def do() -> None:
+            document.add_feature(feature, part)
+
+        def undo() -> None:
+            part.remove_feature(feature.id)
+            document.dependency_graph.remove_node(feature.id)
+            document.recompute()
+
+        do()
+        tx.changes.append(TransactionChange(description=f"Shelled solid {feature.name}", undo_action=undo, redo_action=do))
         tx.is_committed = True
         document.history.push_transaction(tx)
         return tx
