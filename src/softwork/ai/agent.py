@@ -32,6 +32,15 @@ class AgentExecutionResult:
     error_message: Optional[str] = None
 
 
+@dataclass
+class AgentPlan:
+    prompt: str
+    explanation: str
+    tool_calls: List[ToolCall]
+    predicted_delta_vol: float = 0.0
+    ghost_mesh: Optional[Any] = None
+
+
 class CADAgent:
     """
     Antigravity-native CAD Agent translating human intent to deterministic parametric operations.
@@ -42,6 +51,53 @@ class CADAgent:
         self.provider = provider or HeuristicEngineProvider()
         self.tools = ToolRegistry(document)
 
+    def set_provider(self, provider: ModelProvider) -> None:
+        self.provider = provider
+
+    def plan_prompt(self, user_prompt: str) -> AgentPlan:
+        """
+        Generates an AI execution plan with simulated ghost mesh preview before committing.
+        """
+        context = AIContextBuilder.build_context(self.document)
+        schemas = self.tools.get_schemas()
+        response = self.provider.generate(
+            prompt=user_prompt,
+            tools_schema=schemas,
+            context=context,
+        )
+
+        cur_solid = self.document.active_part.active_solid
+        cur_vol = cur_solid.volume if cur_solid else 0.0
+
+        # Estimate proposed delta
+        delta_v = 0.0
+        for call in response.tool_calls:
+            if "extrude" in call.tool_name:
+                dist = float(call.arguments.get("distance", 25.0))
+                delta_v += dist * 1000.0  # approximate volume impact
+            elif "create_box" in call.tool_name:
+                w = float(call.arguments.get("width", 50.0))
+                h = float(call.arguments.get("height", 50.0))
+                d = float(call.arguments.get("depth", 10.0))
+                delta_v += w * h * d
+            elif "create_plate" in call.tool_name:
+                l = float(call.arguments.get("length", 100.0))
+                w = float(call.arguments.get("width", 60.0))
+                t = float(call.arguments.get("thickness", 10.0))
+                delta_v += l * w * t
+            elif "hole_wizard" in call.tool_name or "shell" in call.tool_name:
+                delta_v -= 1500.0
+
+        ghost_mesh = self.document.backend.to_mesh(cur_solid) if cur_solid else None
+
+        return AgentPlan(
+            prompt=user_prompt,
+            explanation=response.content,
+            tool_calls=response.tool_calls,
+            predicted_delta_vol=delta_v,
+            ghost_mesh=ghost_mesh,
+        )
+
     def execute_prompt(self, user_prompt: str) -> AgentExecutionResult:
         """
         Full interaction loop:
@@ -51,11 +107,9 @@ class CADAgent:
         4. Parametric recompute & Geometry Validation
         5. Explainability & Change Review
         """
-        # Step 1: Context Extraction
         context = AIContextBuilder.build_context(self.document)
         schemas = self.tools.get_schemas()
 
-        # Step 2: Intent Reasoning & Planning
         response = self.provider.generate(
             prompt=user_prompt,
             tools_schema=schemas,
@@ -67,7 +121,6 @@ class CADAgent:
             explanation=response.content,
         )
 
-        # Step 3: Tool Execution through Command Layer
         for call in response.tool_calls:
             step = AgentPlanStep(
                 description=f"Call {call.tool_name} with {call.arguments}",
@@ -87,7 +140,6 @@ class CADAgent:
                 result.error_message = f"Error executing '{call.tool_name}': {str(e)}"
                 break
 
-        # Step 4: Validate Geometry
         val_report = self.document.recompute()
         result.validation = val_report
 
