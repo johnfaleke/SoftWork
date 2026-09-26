@@ -1,5 +1,5 @@
 """
-Strict typed AI Tool Registry for SoftWork.
+Strict typed AI Tool Registry for SoftWork v0.2.
 Executes actions exclusively through the deterministic Command layer.
 """
 from __future__ import annotations
@@ -9,10 +9,17 @@ from softwork.commands.feature_commands import (
     CreateBoxCommand,
     CreateMountingPlateCommand,
     AddFilletCommand,
+    AddChamferCommand,
+    CreateSketchCommand,
+    ExtrudeSketchCommand,
+    RevolveSketchCommand,
+    AddPatternCommand,
 )
 from softwork.commands.parameter_commands import SetParameterCommand
 from softwork.core.document import Document
+from softwork.core.feature import SketchFeature
 from softwork.core.transaction import AITransaction
+from softwork.sketch.plane import StandardPlane
 
 
 class ToolRegistry:
@@ -27,6 +34,89 @@ class ToolRegistry:
         self._register_default_tools()
 
     def _register_default_tools(self) -> None:
+        # 1. Sketch creation
+        self.register(
+            name="sketch.create",
+            description="Create a new 2D sketch on a plane (XY, XZ, or YZ)",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "plane": {"type": "string", "enum": ["XY", "XZ", "YZ"], "default": "XY"},
+                    "name": {"type": "string", "default": "Sketch001"},
+                },
+            },
+            handler=lambda args: CreateSketchCommand(
+                name=args.get("name", "Sketch001"),
+                plane_type=StandardPlane(args.get("plane", "XY")),
+                provenance="ai",
+            ).execute(self.document),
+        )
+
+        # 2. Sketch add rectangle
+        self.register(
+            name="sketch.add_rectangle",
+            description="Add a 2D rectangle profile to an existing sketch",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "sketch_id": {"type": "string", "description": "ID or name of sketch feature"},
+                    "width": {"type": "number", "description": "Width in mm"},
+                    "height": {"type": "number", "description": "Height in mm"},
+                    "centered": {"type": "boolean", "default": True},
+                },
+                "required": ["width", "height"],
+            },
+            handler=self._handle_sketch_add_rectangle,
+        )
+
+        # 3. Sketch add circle
+        self.register(
+            name="sketch.add_circle",
+            description="Add a 2D circle profile to an existing sketch",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "sketch_id": {"type": "string", "description": "ID or name of sketch feature"},
+                    "radius": {"type": "number", "description": "Circle radius in mm"},
+                },
+                "required": ["radius"],
+            },
+            handler=self._handle_sketch_add_circle,
+        )
+
+        # 4. Feature extrude
+        self.register(
+            name="feature.extrude",
+            description="Extrude a 2D sketch profile into a 3D solid",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "sketch_id": {"type": "string", "description": "Target sketch feature ID or name"},
+                    "distance": {"type": "number", "description": "Extrusion distance in mm"},
+                    "name": {"type": "string", "default": "Extrude001"},
+                },
+                "required": ["distance"],
+            },
+            handler=self._handle_feature_extrude,
+        )
+
+        # 5. Feature revolve
+        self.register(
+            name="feature.revolve",
+            description="Revolve a 2D sketch profile around an axis by a given angle",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "sketch_id": {"type": "string", "description": "Target sketch feature ID or name"},
+                    "angle_deg": {"type": "number", "default": 360.0},
+                    "axis": {"type": "string", "default": "Y"},
+                    "name": {"type": "string", "default": "Revolve001"},
+                },
+            },
+            handler=self._handle_feature_revolve,
+        )
+
+        # 6. Feature box
         self.register(
             name="feature.create_box",
             description="Create a 3D box solid feature",
@@ -49,6 +139,7 @@ class ToolRegistry:
             ).execute(self.document),
         )
 
+        # 7. Feature mounting plate
         self.register(
             name="feature.create_plate",
             description="Create a parametric mounting plate with 4 corner holes and optional outer fillets",
@@ -77,6 +168,55 @@ class ToolRegistry:
             ).execute(self.document),
         )
 
+        # 8. Feature pattern
+        self.register(
+            name="feature.pattern",
+            description="Create a repeated linear array pattern of a solid feature",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "target_feature_id": {"type": "string"},
+                    "count_x": {"type": "integer", "default": 3},
+                    "count_y": {"type": "integer", "default": 1},
+                    "spacing_x": {"type": "number", "default": 20.0},
+                    "spacing_y": {"type": "number", "default": 0.0},
+                    "name": {"type": "string", "default": "Pattern001"},
+                },
+                "required": ["target_feature_id"],
+            },
+            handler=lambda args: AddPatternCommand(
+                target_feature_id=args["target_feature_id"],
+                count_x=int(args.get("count_x", 3)),
+                count_y=int(args.get("count_y", 1)),
+                spacing_x=float(args.get("spacing_x", 20.0)),
+                spacing_y=float(args.get("spacing_y", 0.0)),
+                name=args.get("name", "Pattern001"),
+                provenance="ai",
+            ).execute(self.document),
+        )
+
+        # 9. Feature chamfer
+        self.register(
+            name="feature.chamfer",
+            description="Apply a chamfer to edges with given distance in mm",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "target_feature_id": {"type": "string"},
+                    "distance": {"type": "number", "default": 1.0},
+                    "name": {"type": "string", "default": "Chamfer001"},
+                },
+                "required": ["target_feature_id"],
+            },
+            handler=lambda args: AddChamferCommand(
+                target_feature_id=args["target_feature_id"],
+                distance=float(args.get("distance", 1.0)),
+                name=args.get("name", "Chamfer001"),
+                provenance="ai",
+            ).execute(self.document),
+        )
+
+        # 10. Parameter modification
         self.register(
             name="parameter.set",
             description="Modify a parametric dimension on an existing feature while preserving dependencies",
@@ -99,6 +239,7 @@ class ToolRegistry:
             ).execute(self.document),
         )
 
+        # 11. Export STEP
         self.register(
             name="export.step",
             description="Export the active solid model to STEP format",
@@ -111,6 +252,54 @@ class ToolRegistry:
             },
             handler=self._handle_export_step,
         )
+
+    def _find_sketch_feature(self, sketch_id: Optional[str] = None) -> SketchFeature:
+        if sketch_id:
+            feat = self.document.get_feature(sketch_id)
+            if isinstance(feat, SketchFeature):
+                return feat
+        for f in self.document.active_part.features:
+            if isinstance(f, SketchFeature):
+                return f
+        raise ValueError("No active Sketch feature found")
+
+    def _handle_sketch_add_rectangle(self, args: Dict[str, Any]) -> AITransaction:
+        sk_feat = self._find_sketch_feature(args.get("sketch_id"))
+        w = float(args["width"])
+        h = float(args["height"])
+        centered = bool(args.get("centered", True))
+        sk_feat.sketch.add_rectangle(w, h, centered=centered)
+        self.document.recompute()
+        return AITransaction(title=f"Add {w}x{h}mm Rectangle to {sk_feat.name}", is_committed=True)
+
+    def _handle_sketch_add_circle(self, args: Dict[str, Any]) -> AITransaction:
+        sk_feat = self._find_sketch_feature(args.get("sketch_id"))
+        r = float(args["radius"])
+        sk_feat.sketch.add_circle(r)
+        self.document.recompute()
+        return AITransaction(title=f"Add R{r}mm Circle to {sk_feat.name}", is_committed=True)
+
+    def _handle_feature_extrude(self, args: Dict[str, Any]) -> AITransaction:
+        sk_feat = self._find_sketch_feature(args.get("sketch_id"))
+        dist = float(args["distance"])
+        return ExtrudeSketchCommand(
+            sketch_feature_id=sk_feat.id,
+            distance=dist,
+            name=args.get("name", "Extrude001"),
+            provenance="ai",
+        ).execute(self.document)
+
+    def _handle_feature_revolve(self, args: Dict[str, Any]) -> AITransaction:
+        sk_feat = self._find_sketch_feature(args.get("sketch_id"))
+        ang = float(args.get("angle_deg", 360.0))
+        axis = args.get("axis", "Y")
+        return RevolveSketchCommand(
+            sketch_feature_id=sk_feat.id,
+            angle_deg=ang,
+            axis=axis,
+            name=args.get("name", "Revolve001"),
+            provenance="ai",
+        ).execute(self.document)
 
     def _handle_export_step(self, args: Dict[str, Any]) -> AITransaction:
         solid = self.document.active_part.active_solid
