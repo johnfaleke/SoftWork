@@ -17,7 +17,10 @@
   - **SolidWorks Studio Gradient Viewport**: Smooth vertical gradient (`#2A2D34` to `#181A1F`), metallic diffuse shaded surfaces, crisp silhouette edges (`#181A1F`), high-contrast cyan face selection (`#00A8FF`), centered **Heads-Up View Toolbar** (`[Fit]`, `[Iso]`, `[Top]`, `[Front]`, `[Right]`, `[Sect]`, `[Style]`), and bottom-left 3D coordinate triad with datum origin.
   - **Parametric Copilot HUD**: Clean engineering command prompt & NLP execution overlay with live provider badges, parameter log, and ghost geometry wireframes.
   - **Engineering Status Bar**: `Editing Part` | `Cursor: X, Y, Z` | `Units: MMGS` | `Rebuilt: Clean`.
-- **v0.4 — AI-Native Parametric Editing**: Semantic references, design-intent metadata, dependency-aware preservation.
+- **v0.4 — AI-Native Parametric Editing & Semantic References** *(✅ Completed)*:
+  - **In-Place Parametric Mutation Engine (`ParametricModifier`)**: Translates NLP modification prompts (*"make the plate 15 mm thick"*, *"change holes from M8 to M10"*, *"increase fillet to 4 mm"*, *"change shell thickness to 3 mm"*) into deterministic parameter commands rather than re-creating duplicate shapes.
+  - **Batch Multi-Parameter Transactions (`BatchSetParameterCommand`)**: Atomic simultaneous dimension resizing (*"resize width to 80 and length to 120"*) in a single undoable transaction.
+  - **Semantic Topological Reference System (`SemanticTopologyMatcher`)**: Persistent topological entity naming (`face:top`, `face:bottom`, `face:hole_inner`, `face:fillet`) solving the CAD topological naming problem across DAG feature recomputations.
 - **v0.5 — Advanced Part Modeling**: Loft, sweep, draft, advanced pattern topologies.
 - **v0.6 — Assemblies**: Components, mates, interference detection, BOM.
 - **v0.7 — Drawings**: Orthographic views, dimensions, annotations, PDF/DXF export.
@@ -74,14 +77,20 @@
 | Module / File | Description | Status |
 | :--- | :--- | :--- |
 | [`ai/provider.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/ai/provider.py) | Cloud LLM providers (`GeminiProvider`, `OpenAIProvider`, `AnthropicProvider`) and deterministic Heuristic engine | ✅ Complete |
-| [`ai/tools.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/ai/tools.py) | Strict typed tool registry (`sketch.create`, `sketch.add_rectangle`, `sketch.add_circle`, `feature.extrude`, `feature.revolve`, `feature.hole_wizard`, `feature.shell`, `feature.pattern`, `feature.chamfer`, `parameter.set`) | ✅ Complete |
+### 5. AI Subsystem (`softwork.ai`) — *v0.3 & v0.4*
+| Module / File | Description | Status |
+| :--- | :--- | :--- |
+| [`ai/provider.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/ai/provider.py) | Cloud LLM providers (`GeminiProvider`, `OpenAIProvider`, `AnthropicProvider`) and deterministic Heuristic engine | ✅ Complete |
+| [`ai/modifier.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/ai/modifier.py) | **Parametric Modifier Engine**: In-place feature parameter mutations, batch edits, and ghost plan generation | ✅ Complete |
+| [`ai/tools.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/ai/tools.py) | Strict typed tool registry (`sketch.create`, `sketch.add_rectangle`, `sketch.add_circle`, `feature.extrude`, `feature.revolve`, `feature.hole_wizard`, `feature.shell`, `feature.pattern`, `feature.chamfer`, `parameter.set`, `parameter.batch_set`) | ✅ Complete |
 | [`ai/context.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/ai/context.py) | Selection & dependency-aware compressed context builder | ✅ Complete |
-| [`ai/agent.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/ai/agent.py) | `CADAgent` (Understand → Plan with Ghost Simulation → Operate → Validate → Explain) | ✅ Complete |
+| [`ai/agent.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/ai/agent.py) | `CADAgent` (Understand → In-Place Modify / Plan with Ghost Simulation → Operate → Validate → Explain) | ✅ Complete |
 
 ### 6. Clean Desktop CAD IDE Architecture (`softwork.qt`) — *SolidWorks & PTC Creo Standard*
 | Module / File | Description | Status |
 | :--- | :--- | :--- |
 | [`core/material.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/core/material.py) | Standard CAD material library (Steel, Aluminum, Titanium, Polymers) with mass, density, and physical properties | ✅ Complete |
+| [`core/semantic.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/core/semantic.py) | **Semantic Reference System**: Persistent topology tags (`face:top`, `face:bottom`, `face:hole_inner`) | ✅ Complete |
 | [`qt/styles.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/qt/styles.py) | SolidWorks & PTC Creo dark slate QSS stylesheet with `#00A8FF` CAD blue accents and precision controls | ✅ Complete |
 | [`qt/activity_bar.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/qt/activity_bar.py) | Clean CAD vertical icon strip (`Tree`, `Feat`, `Prop`, `AI`, `Cfg`) without emojis | ✅ Complete |
 | [`qt/floating_copilot.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/qt/floating_copilot.py) | **Engineering HUD Parametric Copilot Command Prompt** with ghost preview overlay | ✅ Complete |
@@ -98,9 +107,10 @@
 py run_tests.py
 ```
 
-### Test Suites Summary (34 Tests Passing)
+### Test Suites Summary (38 Tests Passing)
 | Test File | Covered Functionality | Result |
 | :--- | :--- | :--- |
+| [`tests/test_v04_ai_parametric_editing.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/tests/test_v04_ai_parametric_editing.py) | In-place parametric thickness/hole/fillet modification, multi-parameter batch dimension edits, and semantic topological reference tagging | ✅ Passed |
 | [`tests/test_core_document.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/tests/test_core_document.py) | Parameter unit conversions (`in`, `mm`, `deg`), DAG recomputation, history undo/redo, Material densities, and mass evaluation | ✅ Passed |
 | [`tests/test_qt_ide_components.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/tests/test_qt_ide_components.py) | PySide6 SolidWorks/Creo QSS tokens, document and CAD agent bindings | ✅ Passed |
 | [`tests/test_ui_theme_and_workspace_settings.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/tests/test_ui_theme_and_workspace_settings.py) | Floating AI Copilot widget lifecycle, Activity Bar navigation, 8 theme palettes, True Black OLED mode, Charcoal grey contrast, theme registration, and workspace settings persistence | ✅ Passed |
@@ -120,8 +130,12 @@ py run_tests.py
    ```bash
    py src/softwork/app/main.py
    ```
-2. **CommandManager Ribbon:** Click through tabs (`Features`, `Sketch`, `Evaluate`, `Parametric Copilot`, `I/O & History`).
-3. **FeatureManager Design Tree:** Observe standard datum planes (`Front Plane`, `Top Plane`, `Right Plane`, `Origin`) and parametric feature nodes.
-4. **SolidWorks Heads-Up View Toolbar:** Click centered buttons (`[Fit]`, `[Iso]`, `[Top]`, `[Front]`, `[Right]`).
-5. **Parametric Copilot HUD:** Drag HUD across 3D viewport canvas; run natural language instructions with ghost geometry preview.
+2. **In-Place Parametric AI Editing:**
+   - In the top command box or floating Copilot HUD, enter *"Make the plate 15 mm thick"*.
+   - Verify that the existing mounting plate's thickness increases in-place without duplicating features.
+   - Enter *"Change the holes to M10"*, then *"Increase fillet to 4 mm"*.
+   - Enter *"Resize width to 80 and length to 120"*.
+3. **Direct In-Viewport 3D Actions:** Click any 3D face to bring up the contextual action capsule (`[Sketch]`, `[Extrude]`, `[Hole]`, `[Fillet]`, `[Normal To]`).
+4. **Physical Mass Properties:** Inspect the PropertyManager for live Mass ($g$), Density ($g/cm^3$), and Volume ($mm^3$).
+
 
