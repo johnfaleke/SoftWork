@@ -435,12 +435,38 @@ class DirectGeometryBackend(CADBackend):
         return res
 
     def union(self, shape_a: CADShape, shape_b: CADShape) -> CADShape:
+        mesh_a = self.to_mesh(shape_a)
+        mesh_b = self.to_mesh(shape_b)
+
+        merged_verts = list(mesh_a.vertices)
+        merged_normals = list(mesh_a.normals)
+        merged_faces = list(mesh_a.faces)
+        merged_edges = list(mesh_a.edges)
+
+        offset = len(merged_verts)
+        for v in mesh_b.vertices:
+            merged_verts.append(v)
+        for n in mesh_b.normals:
+            merged_normals.append(n)
+        for f in mesh_b.faces:
+            merged_faces.append((f[0] + offset, f[1] + offset, f[2] + offset))
+        for e in mesh_b.edges:
+            merged_edges.append((e[0] + offset, e[1] + offset))
+
+        merged_mesh = MeshData(
+            vertices=merged_verts,
+            normals=merged_normals,
+            faces=merged_faces,
+            edges=merged_edges,
+        )
+        merged_mesh.calculate_bounds()
+
         res = CADShape(
             id=f"union_{uuid.uuid4().hex[:8]}",
             shape_type="union",
             volume=shape_a.volume + shape_b.volume,
             is_valid=True,
-            metadata={"a": shape_a.id, "b": shape_b.id, "mesh": shape_a.metadata.get("mesh", MeshData())},
+            metadata={"a": shape_a.id, "b": shape_b.id, "mesh": merged_mesh},
         )
         return res
 
