@@ -22,12 +22,25 @@ class CAD3DCanvas(tk.Canvas):
     - Edge highlighting and coordinate orientation axes
     """
 
-    def __init__(self, master: Any, on_face_selected: Optional[Callable[[int, Tuple[float, float, float]], None]] = None, **kwargs: Any) -> None:
+    def __init__(
+        self,
+        master: Any,
+        on_face_selected: Optional[Callable[[int, Tuple[float, float, float]], None]] = None,
+        on_shape_drawn: Optional[Callable[[str, Dict[str, Any]], None]] = None,
+        **kwargs: Any
+    ) -> None:
         kwargs.setdefault("bg", "#0F172A")  # Deep slate dark background
         kwargs.setdefault("highlightthickness", 0)
         super().__init__(master, **kwargs)
 
         self.on_face_selected = on_face_selected
+        self.on_shape_drawn = on_shape_drawn
+
+        # Interaction Tool Mode: "SELECT", "DRAW_RECTANGLE", "DRAW_CIRCLE", "DRAW_LINE"
+        self.tool_mode: str = "SELECT"
+        self.active_sketch_plane: Optional[Any] = None
+        self._draw_start_uv: Optional[Tuple[float, float]] = None
+        self._draw_cur_uv: Optional[Tuple[float, float]] = None
 
         # Camera state
         self.rot_x: float = 30.0  # Elevation (degrees)
@@ -58,6 +71,14 @@ class CAD3DCanvas(tk.Canvas):
         self.bind("<MouseWheel>", self._on_wheel)
         self.bind("<Configure>", lambda e: self.render())
 
+    def set_tool_mode(self, mode: str, active_plane: Optional[Any] = None) -> None:
+        self.tool_mode = mode
+        if active_plane is not None:
+            self.active_sketch_plane = active_plane
+        self._draw_start_uv = None
+        self._draw_cur_uv = None
+        self.render()
+
     def set_mesh(self, mesh: Optional[MeshData], color: str = "#38BDF8") -> None:
         self._mesh = mesh
         self._solid_color = color
@@ -66,6 +87,8 @@ class CAD3DCanvas(tk.Canvas):
 
     def set_sketches(self, sketches: List[Any]) -> None:
         self._sketches = sketches or []
+        if self._sketches and not self.active_sketch_plane:
+            self.active_sketch_plane = getattr(self._sketches[-1], "plane", None)
         self.render()
 
     def reset_view(self) -> None:
@@ -77,11 +100,84 @@ class CAD3DCanvas(tk.Canvas):
         self.selected_face_idx = None
         self.render()
 
+    def unproject_to_plane(self, screen_x: float, screen_y: float, plane: Any) -> Tuple[float, float]:
+        """Calculates 2D (u, v) on the sketch plane from 2D screen mouse coordinates."""
+        w = self.winfo_width() or 800
+        h = self.winfo_height() or 600
+        cx, cy = w / 2.0, h / 2.0
+        rad_x = math.radians(self.rot_x)
+        rad_y = math.radians(self.rot_y)
+
+        x2 = (screen_x - cx - self.pan_x) / max(0.001, self.zoom)
+        y2 = -(screen_y - cy - self.pan_y) / max(0.001, self.zoom)
+
+        # Inverse rotation Rx(-rad_x), Ry(-rad_y)
+        # 1. Point at z_screen = 0 in camera space
+        cos_x, sin_x = math.cos(-rad_x), math.sin(-rad_x)
+        cos_y, sin_y = math.cos(-rad_y), math.sin(-rad_y)
+
+        # Vector in camera space: (x2, y2, 0)
+        # Ray direction in camera space: (0, 0, 1) -> world ray direction
+        rx_d_y = sin_x
+        rx_d_z = cos_x
+        ray_dx = -sin_y * rx_d_z
+        ray_dy = rx_d_y
+        ray_dz = cos_y * rx_d_z
+
+        # Ray origin:
+        rx_o_y = y2 * cos_x
+        rx_o_z = -y2 * sin_x
+        ray_ox = x2 * cos_y + rx_o_z * sin_y
+        ray_oy = rx_o_y
+        ray_oz = -x2 * sin_y + rx_o_z * cos_y
+
+        p0 = getattr(plane, "origin", None)
+        n = getattr(plane, "normal", None)
+        u_axis = getattr(plane, "u_axis", None)
+        v_axis = getattr(plane, "v_axis", None)
+
+        p0_x = getattr(p0, "x", 0.0)
+        p0_y = getattr(p0, "y", 0.0)
+        p0_z = getattr(p0, "z", 0.0)
+        nx = getattr(n, "x", 0.0)
+        ny = getattr(n, "y", 0.0)
+        nz = getattr(n, "z", 1.0)
+        ux = getattr(u_axis, "x", 1.0)
+        uy = getattr(u_axis, "y", 0.0)
+        uz = getattr(u_axis, "z", 0.0)
+        vx = getattr(v_axis, "x", 0.0)
+        vy = getattr(v_axis, "y", 1.0)
+        vz = getattr(v_axis, "z", 0.0)
+
+        denom = nx * ray_dx + ny * ray_dy + nz * ray_dz
+        if abs(denom) < 1e-6:
+            t = 0.0
+        else:
+            t = (nx * (p0_x - ray_ox) + ny * (p0_y - ray_oy) + nz * (p0_z - ray_oz)) / denom
+
+        hit_x = ray_ox + t * ray_dx
+        hit_y = ray_oy + t * ray_dy
+        hit_z = ray_oz + t * ray_dz
+
+        rel_x = hit_x - p0_x
+        rel_y = hit_y - p0_y
+        rel_z = hit_z - p0_z
+
+        u = rel_x * ux + rel_y * uy + rel_z * uz
+        v = rel_x * vx + rel_y * vy + rel_z * vz
+        return u, v
+
     def _on_left_down(self, event: tk.Event) -> None:
         self._last_mouse_x = event.x
         self._last_mouse_y = event.y
         self._drag_dist = 0.0
-        self._is_panning = bool(event.state & 0x0001)  # Shift key pressed
+        self._is_panning = bool(event.state & 0x0001)
+
+        if self.tool_mode != "SELECT" and self.active_sketch_plane:
+            u, v = self.unproject_to_plane(event.x, event.y, self.active_sketch_plane)
+            self._draw_start_uv = (u, v)
+            self._draw_cur_uv = (u, v)
+            self.render()
 
     def _on_left_drag(self, event: tk.Event) -> None:
         dx = event.x - self._last_mouse_x
@@ -89,6 +185,12 @@ class CAD3DCanvas(tk.Canvas):
         self._drag_dist += abs(dx) + abs(dy)
         self._last_mouse_x = event.x
         self._last_mouse_y = event.y
+
+        if self.tool_mode != "SELECT" and self.active_sketch_plane and self._draw_start_uv:
+            u, v = self.unproject_to_plane(event.x, event.y, self.active_sketch_plane)
+            self._draw_cur_uv = (u, v)
+            self.render()
+            return
 
         if self._is_panning:
             self.pan_x += dx
@@ -100,7 +202,31 @@ class CAD3DCanvas(tk.Canvas):
         self.render()
 
     def _on_left_up(self, event: tk.Event) -> None:
-        # If click without dragging (< 5px movement), perform 3D face raycasting / picking
+        if self.tool_mode != "SELECT" and self._draw_start_uv and self._draw_cur_uv and self.on_shape_drawn:
+            u0, v0 = self._draw_start_uv
+            u1, v1 = self._draw_cur_uv
+            shape_type = self.tool_mode.replace("DRAW_", "").lower()
+
+            if shape_type == "rectangle":
+                w = abs(u1 - u0)
+                h = abs(v1 - v0)
+                if w > 1.0 and h > 1.0:
+                    cu = (u0 + u1) / 2.0
+                    cv = (v0 + v1) / 2.0
+                    self.on_shape_drawn("rectangle", {"width": w, "height": h, "center_u": cu, "center_v": cv, "centered": True})
+            elif shape_type == "circle":
+                r = math.hypot(u1 - u0, v1 - v0)
+                if r > 1.0:
+                    self.on_shape_drawn("circle", {"radius": r, "center_u": u0, "center_v": v0})
+            elif shape_type == "line":
+                if math.hypot(u1 - u0, v1 - v0) > 1.0:
+                    self.on_shape_drawn("line", {"start_u": u0, "start_v": v0, "end_u": u1, "end_v": v1})
+
+            self._draw_start_uv = None
+            self._draw_cur_uv = None
+            self.render()
+            return
+
         if self._drag_dist < 5.0:
             self._pick_face(event.x, event.y)
 
@@ -301,6 +427,47 @@ class CAD3DCanvas(tk.Canvas):
             tag_proj = self._project_point(tag_p3.x, tag_p3.y, tag_p3.z, cx, cy, rad_x, rad_y)
             sk_name = getattr(sketch, "name", "Sketch")
             self.create_text(tag_proj[0], tag_proj[1] - 12, text=f"✏️ {sk_name}", fill="#10B981", font=("Segoe UI", 9, "bold"))
+
+        # 3.5 In-progress interactive drawing preview
+        if self.tool_mode != "SELECT" and self._draw_start_uv and self._draw_cur_uv and self.active_sketch_plane:
+            pl = self.active_sketch_plane
+            u0, v0 = self._draw_start_uv
+            u1, v1 = self._draw_cur_uv
+
+            if self.tool_mode == "DRAW_RECTANGLE":
+                pts_rect = [(u0, v0), (u1, v0), (u1, v1), (u0, v1)]
+                p3_rect = [pl.to_3d(u, v, 0.0) for u, v in pts_rect]
+                proj_r = [self._project_point(p.x, p.y, p.z, cx, cy, rad_x, rad_y) for p in p3_rect]
+                for ri in range(4):
+                    rnxt = (ri + 1) % 4
+                    self.create_line(proj_r[ri][0], proj_r[ri][1], proj_r[rnxt][0], proj_r[rnxt][1], fill="#38BDF8", width=2, dash=(4, 2))
+                w_mm = abs(u1 - u0)
+                h_mm = abs(v1 - v0)
+                self.create_text(proj_r[2][0] + 15, proj_r[2][1] - 10, text=f"📐 {w_mm:.1f} × {h_mm:.1f} mm", fill="#38BDF8", font=("Segoe UI", 10, "bold"))
+
+            elif self.tool_mode == "DRAW_CIRCLE":
+                r_mm = math.hypot(u1 - u0, v1 - v0)
+                circ_pts = []
+                for step in range(32):
+                    th = 2.0 * math.pi * step / 32
+                    cu = u0 + r_mm * math.cos(th)
+                    cv = v0 + r_mm * math.sin(th)
+                    circ_pts.append(pl.to_3d(cu, cv, 0.0))
+                proj_c = [self._project_point(p.x, p.y, p.z, cx, cy, rad_x, rad_y) for p in circ_pts]
+                for ci in range(32):
+                    cnxt = (ci + 1) % 32
+                    self.create_line(proj_c[ci][0], proj_c[ci][1], proj_c[cnxt][0], proj_c[cnxt][1], fill="#38BDF8", width=2, dash=(4, 2))
+                cp0 = self._project_point(pl.to_3d(u0, v0, 0.0).x, pl.to_3d(u0, v0, 0.0).y, pl.to_3d(u0, v0, 0.0).z, cx, cy, rad_x, rad_y)
+                cp1 = self._project_point(pl.to_3d(u1, v1, 0.0).x, pl.to_3d(u1, v1, 0.0).y, pl.to_3d(u1, v1, 0.0).z, cx, cy, rad_x, rad_y)
+                self.create_line(cp0[0], cp0[1], cp1[0], cp1[1], fill="#F59E0B", width=1.5)
+                self.create_text(cp1[0] + 12, cp1[1] - 8, text=f"⭕ R = {r_mm:.1f} mm", fill="#38BDF8", font=("Segoe UI", 10, "bold"))
+
+            elif self.tool_mode == "DRAW_LINE":
+                lp0 = self._project_point(pl.to_3d(u0, v0, 0.0).x, pl.to_3d(u0, v0, 0.0).y, pl.to_3d(u0, v0, 0.0).z, cx, cy, rad_x, rad_y)
+                lp1 = self._project_point(pl.to_3d(u1, v1, 0.0).x, pl.to_3d(u1, v1, 0.0).y, pl.to_3d(u1, v1, 0.0).z, cx, cy, rad_x, rad_y)
+                self.create_line(lp0[0], lp0[1], lp1[0], lp1[1], fill="#38BDF8", width=2.5)
+                len_mm = math.hypot(u1 - u0, v1 - v0)
+                self.create_text(lp1[0] + 12, lp1[1] - 8, text=f"📏 L = {len_mm:.1f} mm", fill="#38BDF8", font=("Segoe UI", 10, "bold"))
 
         # 4. Coordinate Axes
         axis_cx, axis_cy = 60, h - 60
