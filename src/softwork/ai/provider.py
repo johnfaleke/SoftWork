@@ -55,10 +55,11 @@ class HeuristicEngineProvider(ModelProvider):
         tool_calls: List[ToolCall] = []
 
         # 1. Sketch Creation
-        # "Create sketch on XY plane" or "New sketch on XZ"
-        sk_match = re.search(r"(?:create|new|add)\s+sketch(?:\s+on\s+(xy|xz|yz)(?:\s+plane)?)?", p_lower)
+        # "Create sketch on XY plane" or "New sketch on XZ" or "Sketch on plate"
+        sk_match = re.search(r"(?:create|new|add)\s+sketch(?:\s+on\s+(xy|xz|yz|plate|mounting plate|top|face)(?:\s+plane)?)?", p_lower) or re.search(r"^sketch(?:\s+on\s+(xy|xz|yz|plate|top))?", p_lower)
         if sk_match and "extrude" not in p_lower:
-            plane = (sk_match.group(1) or "xy").upper()
+            raw_plane = sk_match.group(1) or "xy"
+            plane = "XY" if raw_plane in ["plate", "mounting plate", "top", "face"] else raw_plane.upper()
             tool_calls.append(
                 ToolCall(tool_name="sketch.create", arguments={"plane": plane, "name": f"Sketch_{plane}"})
             )
@@ -95,10 +96,13 @@ class HeuristicEngineProvider(ModelProvider):
             )
 
         # 4. Extrude Sketch
-        # "Extrude by 25 mm" or "Extrude sketch by 30"
-        ext_match = re.search(r"extrude.*?(?:by|distance|to)?\s*(\d+(?:\.\d+)?)\s*mm?", p_lower)
+        # "Extrude by 25 mm" or "Extrude sketch by 30" or "Extrude on mounting plate"
+        ext_match = re.search(r"extrude.*?(?:(?:by|distance|to)\s*)?(\d+(?:\.\d+)?)\s*mm?", p_lower) or (re.search(r"extrude", p_lower) and "revolve" not in p_lower)
         if ext_match:
-            dist = float(ext_match.group(1))
+            if hasattr(ext_match, "group") and ext_match.group(1):
+                dist = float(ext_match.group(1))
+            else:
+                dist = 25.0
             tool_calls.append(
                 ToolCall(tool_name="feature.extrude", arguments={"distance": dist, "name": "Extrude001"})
             )

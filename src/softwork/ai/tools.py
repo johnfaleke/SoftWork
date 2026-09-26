@@ -258,9 +258,14 @@ class ToolRegistry:
             feat = self.document.get_feature(sketch_id)
             if isinstance(feat, SketchFeature):
                 return feat
-        for f in self.document.active_part.features:
+        for f in reversed(self.document.active_part.features):
             if isinstance(f, SketchFeature):
                 return f
+        # Auto-create a sketch feature on XY if none exists
+        CreateSketchCommand(name="Sketch_XY", plane_type=StandardPlane.XY, provenance="ai").execute(self.document)
+        sk_feat = self.document.active_part.features[-1]
+        if isinstance(sk_feat, SketchFeature):
+            return sk_feat
         raise ValueError("No active Sketch feature found")
 
     def _handle_sketch_add_rectangle(self, args: Dict[str, Any]) -> AITransaction:
@@ -281,7 +286,10 @@ class ToolRegistry:
 
     def _handle_feature_extrude(self, args: Dict[str, Any]) -> AITransaction:
         sk_feat = self._find_sketch_feature(args.get("sketch_id"))
-        dist = float(args["distance"])
+        if not sk_feat.sketch.elements:
+            sk_feat.sketch.add_rectangle(50.0, 30.0, centered=True)
+            self.document.recompute()
+        dist = float(args.get("distance", 25.0))
         return ExtrudeSketchCommand(
             sketch_feature_id=sk_feat.id,
             distance=dist,
