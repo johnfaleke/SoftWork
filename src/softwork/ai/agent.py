@@ -30,20 +30,25 @@ class AgentExecutionResult:
     transactions: List[AITransaction] = field(default_factory=list)
     success: bool = True
     error_message: Optional[str] = None
+    created_feature_id: Optional[str] = None
 
 
 @dataclass
 class AgentPlan:
-    prompt: str
-    explanation: str
-    tool_calls: List[ToolCall]
+    prompt: str = ""
+    explanation: str = ""
+    tool_calls: List[ToolCall] = field(default_factory=list)
     predicted_delta_vol: float = 0.0
     ghost_mesh: Optional[Any] = None
+    intent: Optional[str] = None
+    target_feature_id: Optional[str] = None
+    predicted_tool_calls: List[Dict[str, Any]] = field(default_factory=list)
 
 
 class CADAgent:
     """
     Antigravity-native CAD Agent translating human intent to deterministic parametric operations.
+    Supports in-place parametric modification and new feature synthesis.
     """
 
     def __init__(self, document: Document, provider: Optional[ModelProvider] = None) -> None:
@@ -58,6 +63,15 @@ class CADAgent:
         """
         Generates an AI execution plan with simulated ghost mesh preview before committing.
         """
+        # 1. Check for in-place parametric modification
+        from softwork.ai.modifier import ParametricModifier
+        if ParametricModifier.is_modification_prompt(user_prompt):
+            mod_plan = ParametricModifier.plan_modification(self.document, user_prompt)
+            if mod_plan is not None:
+                mod_plan.prompt = user_prompt
+                return mod_plan
+
+        # 2. General provider planning
         context = AIContextBuilder.build_context(self.document)
         schemas = self.tools.get_schemas()
         response = self.provider.generate(
@@ -74,7 +88,7 @@ class CADAgent:
         for call in response.tool_calls:
             if "extrude" in call.tool_name:
                 dist = float(call.arguments.get("distance", 25.0))
-                delta_v += dist * 1000.0  # approximate volume impact
+                delta_v += dist * 1000.0
             elif "create_box" in call.tool_name:
                 w = float(call.arguments.get("width", 50.0))
                 h = float(call.arguments.get("height", 50.0))
@@ -101,12 +115,22 @@ class CADAgent:
     def execute_prompt(self, user_prompt: str) -> AgentExecutionResult:
         """
         Full interaction loop:
-        1. Context extraction (selection + dependencies)
-        2. Intent reasoning & planning via Provider
-        3. Deterministic tool execution via Command Layer
-        4. Parametric recompute & Geometry Validation
-        5. Explainability & Change Review
+        1. In-place modification check (v0.4)
+        2. Context extraction
+        3. Intent reasoning & planning via Provider
+        4. Deterministic tool execution via Command Layer
+        5. Parametric recompute & Geometry Validation
+        6. Explainability & Change Review
         """
+        # 1. In-place modification check
+        from softwork.ai.modifier import ParametricModifier
+        if ParametricModifier.is_modification_prompt(user_prompt):
+            mod_res = ParametricModifier.execute_modification(self.document, user_prompt)
+            if mod_res is not None:
+                mod_res.prompt = user_prompt
+                return mod_res
+
+        # 2. General provider execution
         context = AIContextBuilder.build_context(self.document)
         schemas = self.tools.get_schemas()
 
@@ -140,7 +164,12 @@ class CADAgent:
                 result.error_message = f"Error executing '{call.tool_name}': {str(e)}"
                 break
 
-        val_report = self.document.recompute()
-        result.validation = val_report
+        # Recompute & Validate
+        self.document.recompute()
+        validator = self.document.backend.validator if hasattr(self.document.backend, "validator") else None
+        if validator and self.document.active_part.active_solid:
+            report = validator.validate(self.document.active_part.active_solid)
+            result.validation = report
+            self.document.latest_validation = report
 
         return result
