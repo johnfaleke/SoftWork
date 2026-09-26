@@ -21,10 +21,26 @@ class Sketch:
     plane: SketchPlane = field(default_factory=SketchPlane)
     elements: List[SketchElement] = field(default_factory=list)
     profiles: List[SketchProfile] = field(default_factory=list)
+    constraints: List[Any] = field(default_factory=list)
 
     def add_element(self, element: SketchElement) -> None:
         self.elements.append(element)
         self.update_profiles()
+
+    def add_constraint(self, constraint: Any) -> None:
+        self.constraints.append(constraint)
+        self.solve()
+
+    def remove_constraint(self, constraint_id: str) -> None:
+        self.constraints = [c for c in self.constraints if c.id != constraint_id]
+        self.solve()
+
+    def solve(self) -> Any:
+        from softwork.sketch.solver import ConstraintSolver
+        solver = ConstraintSolver()
+        report = solver.solve(self.elements, self.constraints)
+        self.update_profiles()
+        return report
 
     def add_rectangle(self, width: float, height: float, center_u: float = 0.0, center_v: float = 0.0, centered: bool = True) -> Rectangle2D:
         rect = Rectangle2D(center_u=center_u, center_v=center_v, width=width, height=height, centered=centered)
@@ -66,4 +82,5 @@ class Sketch:
                 "origin": [self.plane.origin.x, self.plane.origin.y, self.plane.origin.z],
             },
             "elements": [el.to_dict() for el in self.elements],
+            "constraints": [c.to_dict() for c in self.constraints if hasattr(c, "to_dict")],
         }
