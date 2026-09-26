@@ -9,7 +9,7 @@
 - **v0.1 — Foundation** *(✅ Completed)*: Desktop shell, 3D viewport, CAD backend, document model, primitive solids, STEP/STL export.
 - **v0.2 — Parametric Part Modeling** *(✅ Completed)*: 2D sketches, datum planes (XY/XZ/YZ), closed profiles, extrusions, revolutions, patterns, chamfers, face picking, 2D constraint solver, viewport drawing.
 - **v0.3 — AI CAD Copilot & Advanced Features** *(✅ Completed)*: Live cloud LLM providers (Gemini, Claude, OpenAI), visual AI ghost mesh preview & HUD volume delta, ISO Hole Wizard (M3-M16 Counterbore/Countersink), Shell/Hollow feature.
-- **Modern UI & Workspace Customization** *(✅ Completed)*: Theme engine with 8 presets (OLED True Black, Charcoal, Studio Light, Nordic Frost, Cyberpunk Neon, Industrial Titanium, Forest Sage, Solarized Dark), high-contrast CAD sketch visibility, persistent workspace settings (`~/.softwork/workspace_settings.json`), 3D viewport quick view HUD buttons.
+- **Modern IDE Architecture & UI Customization** *(✅ Completed)*: Vertical Activity Bar, **Draggable & Collapsible Floating AI Copilot HUD**, breadcrumb navigation, theme engine with 8 presets (OLED True Black, Charcoal, Studio Light, Nordic Frost, Cyberpunk Neon, Industrial Titanium, Forest Sage, Solarized Dark), persistent workspace settings (`~/.softwork/workspace_settings.json`).
 - **v0.4 — AI-Native Parametric Editing**: Semantic references, design-intent metadata, dependency-aware preservation.
 - **v0.5 — Advanced Part Modeling**: Loft, sweep, draft, advanced pattern topologies.
 - **v0.6 — Assemblies**: Components, mates, interference detection, BOM.
@@ -74,11 +74,13 @@
 ### 6. Modern Desktop User Interface & Theme System (`softwork.ui`)
 | Module / File | Description | Status |
 | :--- | :--- | :--- |
+| [`ui/floating_copilot.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/ui/floating_copilot.py) | **Draggable, Collapsible & Expandable Floating AI Copilot Widget** overlaid on top of 3D canvas with conversation logs, prompt chips, and ghost preview | ✅ Complete |
+| [`ui/activity_bar.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/ui/activity_bar.py) | **Vertical IDE Activity Bar** providing fast navigation across Model Tree, Tools, Inspector, and Settings | ✅ Complete |
 | [`ui/theme.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/ui/theme.py) | `ThemePalette` & `ThemeManager` with **8 Rich Presets** (Obsidian Pitch OLED Black, Monochrome Charcoal, Studio Light, Nordic Frost, Cyberpunk Neon, Industrial Titanium, Forest Sage, Solarized Dark) and high-contrast sketch wireframe colors | ✅ Complete |
 | [`ui/workspace_settings.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/ui/workspace_settings.py) | `WorkspaceSettings` dataclass and JSON persistence in `~/.softwork/workspace_settings.json` | ✅ Complete |
 | [`ui/workspace_dialog.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/ui/workspace_dialog.py) | Modern Preferences modal for selecting themes with live previews, units, grid spacing, shading mode, and gizmo toggles | ✅ Complete |
 | [`ui/viewport.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/ui/viewport.py) | 3D Canvas with **True Black / Charcoal Shading**, **Quick View HUD Buttons (`Iso`, `Top`, `Front`, `Right`)**, **AI Ghost Mesh Preview**, **Floating Volume Delta Badge**, **Interactive 2D Sketching**, and **3D Face Picking** | ✅ Complete |
-| [`ui/main_window.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/ui/main_window.py) | View menu theme selector, Workspace Settings trigger, Model Tree, Properties, AI Bar | ✅ Complete |
+| [`ui/main_window.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/ui/main_window.py) | Modern IDE layout, Ribbon Toolbar, Activity Bar, Breadcrumbs, Model Tree, Properties, Floating AI Copilot | ✅ Complete |
 | [`app/main.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/app/main.py) | Application bootstrap and CLI entry point | ✅ Complete |
 
 ---
@@ -90,10 +92,10 @@
 py run_tests.py
 ```
 
-### Test Suites Summary (30 Tests)
+### Test Suites Summary (31 Tests)
 | Test File | Covered Functionality | Result |
 | :--- | :--- | :--- |
-| [`tests/test_ui_theme_and_workspace_settings.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/tests/test_ui_theme_and_workspace_settings.py) | 8 theme palettes, True Black OLED mode, Charcoal grey contrast, theme registration, and workspace settings persistence | ✅ Passed |
+| [`tests/test_ui_theme_and_workspace_settings.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/tests/test_ui_theme_and_workspace_settings.py) | Floating AI Copilot widget lifecycle, Activity Bar navigation, 8 theme palettes, True Black OLED mode, Charcoal grey contrast, theme registration, and workspace settings persistence | ✅ Passed |
 | [`tests/test_v03_ai_copilot_and_advanced_features.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/tests/test_v03_ai_copilot_and_advanced_features.py) | ISO Metric Hole Wizard, Shell hollowing, Cloud Provider fallback, and AI Ghost preview generation | ✅ Passed |
 | [`tests/test_constraint_solver.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/tests/test_constraint_solver.py) | 2D Geometric constraint solver: Coincident, Fixed, Horizontal, Vertical, Radius, and DOF diagnostics | ✅ Passed |
 | [`tests/test_sketch_and_profiles.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/tests/test_sketch_and_profiles.py) | Sketch plane transforms, rectangle/circle 2D profiles, Shoelace area, and loop detection | ✅ Passed |
@@ -107,7 +109,10 @@ py run_tests.py
 
 ## 💻 Manual Verification Checklist
 
-1. **Workspace Preferences:** Click `⚙️ Settings` (or **Edit $\rightarrow$ ⚙️ Workspace Settings & Themes...**) to switch between all 8 themes (`Obsidian Pitch`, `Monochrome Charcoal`, `Studio Light`, `Nordic Frost`, `Cyberpunk Neon`, `Industrial Titanium`, `Forest Sage`, `Solarized Dark`).
-2. **View Menu Direct Selector:** Select any theme immediately via **View $\rightarrow$ 🎨 Themes**.
-3. **High-Contrast 2D & 3D Drawing:** Active sketch lines display in high-visibility neon green (`#00FF66`), geometry in electric cyan (`#00F0FF`), and selection in gold amber (`#FFB800`) over deep pitch black surfaces.
-4. **Quick View HUD:** Click `[Iso]`, `[Top]`, `[Front]`, or `[Right]` in the top-left of the 3D viewport canvas.
+1. **Floating AI Copilot:**
+   - Click and drag the `✨ SoftWork Copilot` header to move the chat widget anywhere in the 3D workspace.
+   - Click `▲` / `▼` to collapse into a compact prompt pill or expand into full conversational log with quick prompt chips.
+   - Toggle visibility via `✨ AI Copilot` in the toolbar or Activity Bar.
+2. **Modern IDE Activity Bar:** Click the left vertical icons (`📁 Tree`, `🛠️ Tools`, `📊 Inspector`, `⚙️ Settings`) to switch views.
+3. **Workspace Preferences & 8 Themes:** Click `⚙️ Settings` (or **Edit $\rightarrow$ ⚙️ Workspace Settings & Themes...**) to switch between all 8 themes.
+4. **High-Contrast CAD Elements:** Active sketch lines display in high-visibility neon green (`#00FF66`), geometry in electric cyan (`#00F0FF`), and selection in gold amber (`#FFB800`) over deep pitch black surfaces.
