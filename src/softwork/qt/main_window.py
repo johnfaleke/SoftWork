@@ -353,7 +353,7 @@ class CADMainWindow(QMainWindow):
         self.lbl_status_units.setStyleSheet("color: #DCE1E8; padding-right: 12px; font-weight: 600;")
         self.status_bar.addPermanentWidget(self.lbl_status_units)
 
-        self.lbl_status_rebuild = QLabel("[Rebuilt: Clean]")
+        self.lbl_status_rebuild = QLabel("Rebuilt Clean")
         self.lbl_status_rebuild.setStyleSheet("color: #98C379; font-weight: 600;")
         self.status_bar.addPermanentWidget(self.lbl_status_rebuild)
 
@@ -426,7 +426,7 @@ class CADMainWindow(QMainWindow):
 
         # Material node (SolidWorks style)
         mat_name = getattr(self.document.material, "name", "Aluminum 6061-T6")
-        mat_item = QTreeWidgetItem([f"Material <{mat_name}>", "Material", "Assigned"])
+        mat_item = QTreeWidgetItem([f"Material: {mat_name}", "Material", "Assigned"])
         part_item.addChild(mat_item)
 
         # Standard Datums
@@ -444,19 +444,19 @@ class CADMainWindow(QMainWindow):
                 if sk_id:
                     sk_node = self.document.get_feature(sk_id)
                     if sk_node:
-                        feat_item.addChild(QTreeWidgetItem([f"(-) {sk_node.name}", "SketchProfile", "UnderDefined"]))
+                        feat_item.addChild(QTreeWidgetItem([sk_node.name, "SketchProfile", "UnderDefined"]))
 
         self.tree.expandAll()
 
         # Update Breadcrumbs
         feat_name = self.document.active_part.features[-1].name if self.document.active_part.features else "Empty"
-        self.lbl_breadcrumb.setText(f"{self.document.name} > {self.document.active_part.name} > {feat_name}")
+        self.lbl_breadcrumb.setText(f"{self.document.name} / {self.document.active_part.name} / {feat_name}")
 
         self._refresh_properties()
 
         vol = solid.volume if solid else 0.0
         mass = self.document.material.calculate_mass_grams(vol)
-        self.status_bar.showMessage(f"Solid Valid | Volume: {vol:,.1f} mm³ | Mass: {mass:,.1f} g ({self.document.material.name})")
+        self.status_bar.showMessage(f"Solid Valid | Volume: {vol:,.1f} mm3 | Mass: {mass:,.1f} g ({self.document.material.name})")
 
     def _refresh_properties(self) -> None:
         while self.props_layout.count():
