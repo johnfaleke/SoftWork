@@ -7,9 +7,9 @@
 ## 🗺️ Roadmap Reference in `SoftWork.md`
 
 - **v0.1 — Foundation** *(✅ Completed)*: Desktop shell, 3D viewport, CAD backend, document model, primitive solids, STEP/STL export.
-- **v0.1 — Foundation** *(✅ Completed)*: Desktop shell, 3D viewport, CAD backend, document model, primitive solids, STEP/STL export.
 - **v0.2 — Parametric Part Modeling** *(✅ Completed)*: 2D sketches, datum planes (XY/XZ/YZ), closed profiles, extrusions, revolutions, patterns, chamfers, face picking, 2D constraint solver, viewport drawing.
 - **v0.3 — AI CAD Copilot & Advanced Features** *(✅ Completed)*: Live cloud LLM providers (Gemini, Claude, OpenAI), visual AI ghost mesh preview & HUD volume delta, ISO Hole Wizard (M3-M16 Counterbore/Countersink), Shell/Hollow feature.
+- **Modern UI & Workspace Customization** *(✅ Completed)*: Theme engine (Dark/Light/Cyberpunk/Titanium/Custom), dynamic theme switching, persistent workspace settings (`~/.softwork/workspace_settings.json`), 3D viewport quick view orientation cube/HUD buttons.
 - **v0.4 — AI-Native Parametric Editing**: Semantic references, design-intent metadata, dependency-aware preservation.
 - **v0.5 — Advanced Part Modeling**: Loft, sweep, draft, advanced pattern topologies.
 - **v0.6 — Assemblies**: Components, mates, interference detection, BOM.
@@ -71,11 +71,14 @@
 | [`ai/context.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/ai/context.py) | Selection & dependency-aware compressed context builder | ✅ Complete |
 | [`ai/agent.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/ai/agent.py) | `CADAgent` (Understand → Plan with Ghost Simulation → Operate → Validate → Explain) | ✅ Complete |
 
-### 6. Desktop User Interface (`softwork.ui`) — *v0.3*
+### 6. Modern Desktop User Interface & Theme System (`softwork.ui`)
 | Module / File | Description | Status |
 | :--- | :--- | :--- |
-| [`ui/viewport.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/ui/viewport.py) | 3D Canvas with **AI Ghost Preview Mesh Overlay**, **Floating HUD Volume Delta Badge**, **Interactive 2D Sketch Drawing**, and **3D Face Picking** | ✅ Complete |
-| [`ui/main_window.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/ui/main_window.py) | Cloud AI API Key Setup Modal, Design Toolbar (`Hole`, `Shell`, `Sketch`, `Extrude`, `Revolve`), Tree, Properties, AI Bar | ✅ Complete |
+| [`ui/theme.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/ui/theme.py) | `ThemePalette` & `ThemeManager` with built-in Dark, Light, Cyberpunk, and Titanium palettes | ✅ Complete |
+| [`ui/workspace_settings.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/ui/workspace_settings.py) | `WorkspaceSettings` dataclass and JSON persistence in `~/.softwork/workspace_settings.json` | ✅ Complete |
+| [`ui/workspace_dialog.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/ui/workspace_dialog.py) | Modern Preferences modal for live theme, units, grid spacing, shading mode, and gizmo toggles | ✅ Complete |
+| [`ui/viewport.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/ui/viewport.py) | 3D Canvas with **Dynamic Theme Rendering**, **Quick View HUD Buttons (`Iso`, `Top`, `Front`, `Right`)**, **AI Ghost Mesh Preview**, **Floating Volume Delta Badge**, **Interactive 2D Sketching**, and **3D Face Picking** | ✅ Complete |
+| [`ui/main_window.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/ui/main_window.py) | Quick Theme Toggle (`🌙 Dark`/`☀️ Light`), Workspace Settings trigger, Model Tree, Properties, AI Bar | ✅ Complete |
 | [`app/main.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/src/softwork/app/main.py) | Application bootstrap and CLI entry point | ✅ Complete |
 
 ---
@@ -87,9 +90,10 @@
 py run_tests.py
 ```
 
-### Test Suites Summary (25 Tests)
+### Test Suites Summary (30 Tests)
 | Test File | Covered Functionality | Result |
 | :--- | :--- | :--- |
+| [`tests/test_ui_theme_and_workspace_settings.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/tests/test_ui_theme_and_workspace_settings.py) | Theme palettes, Dark/Light switching, custom theme registration, and workspace settings persistence | ✅ Passed |
 | [`tests/test_v03_ai_copilot_and_advanced_features.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/tests/test_v03_ai_copilot_and_advanced_features.py) | ISO Metric Hole Wizard, Shell hollowing, Cloud Provider fallback, and AI Ghost preview generation | ✅ Passed |
 | [`tests/test_constraint_solver.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/tests/test_constraint_solver.py) | 2D Geometric constraint solver: Coincident, Fixed, Horizontal, Vertical, Radius, and DOF diagnostics | ✅ Passed |
 | [`tests/test_sketch_and_profiles.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/tests/test_sketch_and_profiles.py) | Sketch plane transforms, rectangle/circle 2D profiles, Shoelace area, and loop detection | ✅ Passed |
@@ -99,18 +103,11 @@ py run_tests.py
 | [`tests/test_ai_agent_and_tools.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/tests/test_ai_agent_and_tools.py) | CAD agent natural-language creation, hole additions, filleting, and thickness update | ✅ Passed |
 | [`tests/test_formats_and_serialization.py`](file:///c:/Users/BLVCK/Desktop/SoftWork/tests/test_formats_and_serialization.py) | Save/load `.softwork` document files, STEP AP214 export, and binary STL exports | ✅ Passed |
 
-**Result:** 25 tests ran in 0.492s — **100% OK**.
-
 ---
 
-## 🚀 How to Run SoftWork
+## 💻 Manual Verification Checklist
 
-### 1. Launch the Desktop GUI (v0.3)
-```bash
-py src/softwork/app/main.py
-```
-- **Visual AI Ghost Preview:** When querying the AI Copilot, a semi-transparent dashed amber preview of the proposed shape and a floating `Δ Vol` HUD badge appears before applying changes.
-- **Cloud LLM Configuration:** Click **AI -> ⚙️ Configure Cloud AI Keys...** to connect Google Gemini (1.5 Pro), OpenAI (GPT-4o), or Anthropic (Claude 3.5 Sonnet).
-- **ISO Metric Hole Wizard & Shelling:** Add M3..M16 standard counterbore holes or shell solid bodies with 1-click toolbar buttons or AI prompts.
-- **Interactive Viewport Drawing:** Click `▭ Rect`, `⭕ Circle`, or `╱ Line` on the toolbar, then click & drag directly on the 3D viewport canvas.
-- **2D Geometric Constraint Solver:** In the Properties panel for any sketch, inspect degrees of freedom (DOF) and click `📐 Solve Constraints (DOF)` to resolve geometric constraints.
+1. **Quick Dark/Light Toggle:** Click `☀️ Light` / `🌙 Dark` in the top-right toolbar to toggle app themes in real-time.
+2. **Workspace Preferences:** Click `⚙️ Settings` to open the modal and customize Grid Spacing, Shading Mode, or switch between Dark, Light, Cyberpunk Neon, and Industrial Titanium.
+3. **Quick View HUD:** Click `[Iso]`, `[Top]`, `[Front]`, or `[Right]` in the top-left of the 3D viewport canvas.
+4. **Natural Language AI Copilot:** Type `Create sketch on XY plane` or `Add four M8 holes, 10 mm from each corner` in the AI command bar to preview ghost volume delta and generate geometry.
