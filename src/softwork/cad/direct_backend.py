@@ -1,6 +1,6 @@
 """
 Direct pure-Python geometric backend for SoftWork.
-Provides solid geometry generation, CSG, exact tessellation, and native STEP/STL export.
+Provides solid geometry generation, CSG, exact tessellation, sketch extrusions, revolutions, and exports.
 """
 from __future__ import annotations
 import math
@@ -10,12 +10,14 @@ from typing import Optional, List, Tuple, Dict, Any
 from softwork.cad.backend import CADBackend
 from softwork.cad.geometry import MeshData, BoundingBox, Point3D, Vector3D
 from softwork.cad.topology import CADShape
+from softwork.sketch.profile import SketchProfile
+from softwork.sketch.plane import SketchPlane, StandardPlane
 
 
 class DirectGeometryBackend(CADBackend):
     """
     Standard geometric CAD backend.
-    Ensures deterministic parametric modeling and viewport rendering.
+    Ensures deterministic parametric modeling, sketch extrusions, and viewport rendering.
     """
 
     def name(self) -> str:
@@ -35,7 +37,6 @@ class DirectGeometryBackend(CADBackend):
             min_y, max_y = -dy, dy
             min_z, max_z = -dz, dz
 
-        # Define 8 vertices
         raw_vertices = [
             (min_x, min_y, min_z),  # 0
             (max_x, min_y, min_z),  # 1
@@ -47,19 +48,12 @@ class DirectGeometryBackend(CADBackend):
             (min_x, max_y, max_z),  # 7
         ]
 
-        # 12 triangular faces (2 per box face, CCW normal facing outwards)
         faces = [
-            # -Z face (0,1,2,3)
             (0, 2, 1), (0, 3, 2),
-            # +Z face (4,5,6,7)
             (4, 5, 6), (4, 6, 7),
-            # -Y face (0,1,5,4)
             (0, 1, 5), (0, 5, 4),
-            # +Y face (3,2,6,7)
             (3, 6, 2), (3, 7, 6),
-            # -X face (0,4,7,3)
             (0, 4, 7), (0, 7, 3),
-            # +X face (1,2,6,5)
             (1, 6, 2), (1, 5, 6),
         ]
 
@@ -104,17 +98,14 @@ class DirectGeometryBackend(CADBackend):
         faces: List[Tuple[int, int, int]] = []
         edges: List[Tuple[int, int]] = []
 
-        # Bottom circle vertices: 0..segments-1
         for i in range(segments):
             angle = 2.0 * math.pi * i / segments
             vertices.append((radius * math.cos(angle), radius * math.sin(angle), z_min))
 
-        # Top circle vertices: segments..2*segments-1
         for i in range(segments):
             angle = 2.0 * math.pi * i / segments
             vertices.append((radius * math.cos(angle), radius * math.sin(angle), z_max))
 
-        # Center vertices: bottom (2*segments), top (2*segments+1)
         bottom_center_idx = len(vertices)
         vertices.append((0.0, 0.0, z_min))
         top_center_idx = len(vertices)
@@ -122,14 +113,10 @@ class DirectGeometryBackend(CADBackend):
 
         for i in range(segments):
             nxt = (i + 1) % segments
-            # Bottom cap
             faces.append((bottom_center_idx, nxt, i))
-            # Top cap
             faces.append((top_center_idx, segments + i, segments + nxt))
-            # Side quads (2 triangles)
             faces.append((i, nxt, segments + nxt))
             faces.append((i, segments + nxt, segments + i))
-            # Edges
             edges.append((i, nxt))
             edges.append((segments + i, segments + nxt))
             edges.append((i, segments + i))
@@ -152,6 +139,162 @@ class DirectGeometryBackend(CADBackend):
         )
         return shape
 
+    def extrude_profile(self, profile: SketchProfile, distance: float, plane: Optional[SketchPlane] = None) -> CADShape:
+        if distance <= 0:
+            raise ValueError(f"Extrusion distance must be positive, got {distance}")
+        if not profile.is_closed:
+            raise ValueError("Cannot extrude an open or unclosed sketch profile")
+
+        pl = plane or SketchPlane()
+        pts = profile.outer_loop
+        n = len(pts)
+
+        vertices: List[Tuple[float, float, float]] = []
+        faces: List[Tuple[int, int, int]] = []
+        edges: List[Tuple[int, int]] = []
+
+        # 1. Bottom vertices (w = 0)
+        for p in pts:
+            p3 = pl.to_3d(p.u, p.v, 0.0)
+            vertices.append(p3.to_tuple())
+
+        # 2. Top vertices (w = distance)
+        for p in pts:
+            p3 = pl.to_3d(p.u, p.v, distance)
+            vertices.append(p3.to_tuple())
+
+        # 3. Side faces and edges
+        for i in range(n):
+            nxt = (i + 1) % n
+            top_i = n + i
+            top_nxt = n + nxt
+            faces.append((i, top_nxt, top_i))
+            faces.append((i, nxt, top_nxt))
+            edges.append((i, nxt))
+            edges.append((top_i, top_nxt))
+            edges.append((i, top_i))
+
+        # 4. Caps (fan triangulation)
+        # Bottom cap center
+        avg_u = sum(p.u for p in pts) / n
+        avg_v = sum(p.v for p in pts) / n
+        bot_center_idx = len(vertices)
+        vertices.append(pl.to_3d(avg_u, avg_v, 0.0).to_tuple())
+        top_center_idx = len(vertices)
+        vertices.append(pl.to_3d(avg_u, avg_v, distance).to_tuple())
+
+        for i in range(n):
+            nxt = (i + 1) % n
+            faces.append((bot_center_idx, i, nxt))
+            faces.append((top_center_idx, n + nxt, n + i))
+
+        mesh = MeshData(vertices=vertices, faces=faces, edges=edges)
+        mesh.calculate_bounds()
+
+        prof_area = profile.area()
+        vol = prof_area * distance
+
+        shape = CADShape(
+            id=f"extrude_{uuid.uuid4().hex[:8]}",
+            shape_type="extrude",
+            volume=vol,
+            surface_area=2.0 * prof_area,
+            is_valid=True,
+            metadata={"distance": distance, "mesh": mesh, "profile": profile},
+        )
+        return shape
+
+    def revolve_profile(self, profile: SketchProfile, angle_deg: float, axis: str = "Y", plane: Optional[SketchPlane] = None, segments: int = 32) -> CADShape:
+        if angle_deg <= 0 or angle_deg > 360.0:
+            raise ValueError(f"Revolve angle must be between 0 and 360 degrees, got {angle_deg}")
+        if not profile.is_closed:
+            raise ValueError("Cannot revolve an open sketch profile")
+
+        pts = profile.outer_loop
+        n_pts = len(pts)
+        n_steps = max(8, int(segments * (angle_deg / 360.0)))
+        total_rad = math.radians(angle_deg)
+
+        vertices: List[Tuple[float, float, float]] = []
+        faces: List[Tuple[int, int, int]] = []
+        edges: List[Tuple[int, int]] = []
+
+        for step in range(n_steps + 1):
+            theta = total_rad * (step / n_steps)
+            cos_t, sin_t = math.cos(theta), math.sin(theta)
+            for p in pts:
+                # Revolve around V axis (Y): u becomes radius in XZ
+                r = p.u
+                y = p.v
+                x = r * cos_t
+                z = r * sin_t
+                vertices.append((x, y, z))
+
+        # Build surface quads
+        for step in range(n_steps):
+            ring1 = step * n_pts
+            ring2 = (step + 1) * n_pts
+            for i in range(n_pts):
+                nxt = (i + 1) % n_pts
+                p1, p2 = ring1 + i, ring1 + nxt
+                p3, p4 = ring2 + i, ring2 + nxt
+                faces.append((p1, p4, p3))
+                faces.append((p1, p2, p4))
+                edges.append((p1, p2))
+                edges.append((p1, p3))
+
+        mesh = MeshData(vertices=vertices, faces=faces, edges=edges)
+        mesh.calculate_bounds()
+
+        vol = profile.area() * 2.0 * math.pi * max(0.1, sum(abs(p.u) for p in pts) / n_pts) * (angle_deg / 360.0)
+
+        shape = CADShape(
+            id=f"revolve_{uuid.uuid4().hex[:8]}",
+            shape_type="revolve",
+            volume=vol,
+            is_valid=True,
+            metadata={"angle_deg": angle_deg, "axis": axis, "mesh": mesh},
+        )
+        return shape
+
+    def pattern_linear(self, shape: CADShape, count_x: int, count_y: int, spacing_x: float, spacing_y: float) -> CADShape:
+        mesh = self.to_mesh(shape)
+        new_verts: List[Tuple[float, float, float]] = []
+        new_faces: List[Tuple[int, int, int]] = []
+        new_edges: List[Tuple[int, int]] = []
+
+        total_vol = 0.0
+        for ix in range(count_x):
+            for iy in range(count_y):
+                dx = ix * spacing_x
+                dy = iy * spacing_y
+                v_offset = len(new_verts)
+                for v in mesh.vertices:
+                    new_verts.append((v[0] + dx, v[1] + dy, v[2]))
+                for f in mesh.faces:
+                    new_faces.append((f[0] + v_offset, f[1] + v_offset, f[2] + v_offset))
+                for e in mesh.edges:
+                    new_edges.append((e[0] + v_offset, e[1] + v_offset))
+                total_vol += shape.volume
+
+        pattern_mesh = MeshData(vertices=new_verts, faces=new_faces, edges=new_edges)
+        pattern_mesh.calculate_bounds()
+
+        return CADShape(
+            id=f"pattern_{uuid.uuid4().hex[:8]}",
+            shape_type="pattern",
+            volume=total_vol,
+            is_valid=True,
+            metadata={
+                "base_shape": shape.id,
+                "count_x": count_x,
+                "count_y": count_y,
+                "spacing_x": spacing_x,
+                "spacing_y": spacing_y,
+                "mesh": pattern_mesh,
+            },
+        )
+
     def create_plate_with_holes(
         self,
         length: float,
@@ -161,9 +304,6 @@ class DirectGeometryBackend(CADBackend):
         hole_offset: float,
         fillet_radius: float = 0.0,
     ) -> CADShape:
-        """
-        Creates an engineered mounting plate with 4 corner holes and optional rounded corners.
-        """
         if length <= 0 or width <= 0 or thickness <= 0:
             raise ValueError("Plate dimensions must be positive")
 
@@ -171,7 +311,6 @@ class DirectGeometryBackend(CADBackend):
         z_min = -thickness / 2.0
         z_max = thickness / 2.0
 
-        # Calculate corner hole centers
         x_off = length / 2.0 - hole_offset
         y_off = width / 2.0 - hole_offset
         hole_centers = [
@@ -181,17 +320,15 @@ class DirectGeometryBackend(CADBackend):
             (x_off, -y_off),
         ]
 
-        # Generate outer profile with optional rounded corners
         outer_pts_2d: List[Tuple[float, float]] = []
         r = min(fillet_radius, min(length, width) / 4.0)
-        
+
         if r > 0.001:
-            # 4 rounded corners with 8 segments each
             corners = [
-                (length / 2.0 - r, width / 2.0 - r, 0),      # Top-right
-                (-length / 2.0 + r, width / 2.0 - r, math.pi/2), # Top-left
-                (-length / 2.0 + r, -width / 2.0 + r, math.pi),  # Bottom-left
-                (length / 2.0 - r, -width / 2.0 + r, 3*math.pi/2), # Bottom-right
+                (length / 2.0 - r, width / 2.0 - r, 0),
+                (-length / 2.0 + r, width / 2.0 - r, math.pi/2),
+                (-length / 2.0 + r, -width / 2.0 + r, math.pi),
+                (length / 2.0 - r, -width / 2.0 + r, 3*math.pi/2),
             ]
             for cx, cy, start_angle in corners:
                 for s in range(8):
@@ -211,15 +348,12 @@ class DirectGeometryBackend(CADBackend):
 
         n_outer = len(outer_pts_2d)
 
-        # 1. Outer bottom vertices (0 .. n_outer-1)
         for x, y in outer_pts_2d:
             vertices.append((x, y, z_min))
 
-        # 2. Outer top vertices (n_outer .. 2*n_outer-1)
         for x, y in outer_pts_2d:
             vertices.append((x, y, z_max))
 
-        # Outer side faces & edges
         for i in range(n_outer):
             nxt = (i + 1) % n_outer
             top_i = n_outer + i
@@ -230,9 +364,7 @@ class DirectGeometryBackend(CADBackend):
             edges.append((top_i, top_nxt))
             edges.append((i, top_i))
 
-        # 3. Add 4 hole cylinders inside
         n_hole_segs = 16
-        hole_rings = []
         for hc_x, hc_y in hole_centers:
             h_bot_start = len(vertices)
             for s in range(n_hole_segs):
@@ -243,7 +375,6 @@ class DirectGeometryBackend(CADBackend):
                 ang = 2.0 * math.pi * s / n_hole_segs
                 vertices.append((hc_x + hole_radius * math.cos(ang), hc_y + hole_radius * math.sin(ang), z_max))
 
-            # Inner hole cylindrical walls (normals facing inward)
             for s in range(n_hole_segs):
                 nxt = (s + 1) % n_hole_segs
                 b_curr, b_nxt = h_bot_start + s, h_bot_start + nxt
@@ -253,9 +384,6 @@ class DirectGeometryBackend(CADBackend):
                 edges.append((b_curr, b_nxt))
                 edges.append((t_curr, t_nxt))
 
-            hole_rings.append((h_bot_start, h_top_start, n_hole_segs))
-
-        # 4. Triangulate Top and Bottom Caps (using center fan triangulations)
         c_bot_idx = len(vertices)
         vertices.append((0.0, 0.0, z_min))
         c_top_idx = len(vertices)
@@ -263,9 +391,7 @@ class DirectGeometryBackend(CADBackend):
 
         for i in range(n_outer):
             nxt = (i + 1) % n_outer
-            # Bottom cap
             faces.append((c_bot_idx, i, nxt))
-            # Top cap
             faces.append((c_top_idx, n_outer + nxt, n_outer + i))
 
         mesh = MeshData(vertices=vertices, faces=faces, edges=edges)
@@ -329,7 +455,6 @@ class DirectGeometryBackend(CADBackend):
         return res
 
     def fillet(self, shape: CADShape, radius: float) -> CADShape:
-        # If the shape is a plate or box, regenerate with rounded edges
         meta = dict(shape.metadata)
         meta["fillet_radius"] = radius
         if "length" in meta and "width" in meta and "thickness" in meta and "hole_diameter" in meta:

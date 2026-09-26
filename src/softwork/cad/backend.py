@@ -7,6 +7,8 @@ from typing import Optional, List, Tuple, Dict, Any
 
 from softwork.cad.geometry import MeshData
 from softwork.cad.topology import CADShape
+from softwork.sketch.profile import SketchProfile
+from softwork.sketch.plane import SketchPlane
 
 
 class CADBackend(ABC):
@@ -40,9 +42,17 @@ class CADBackend(ABC):
         hole_offset: float,
         fillet_radius: float = 0.0,
     ) -> CADShape:
-        """
-        Create a parametric mounting plate with four corner holes and optional outer fillet.
-        """
+        """Create a parametric mounting plate with four corner holes and optional outer fillet."""
+        pass
+
+    @abstractmethod
+    def extrude_profile(self, profile: SketchProfile, distance: float, plane: Optional[SketchPlane] = None) -> CADShape:
+        """Extrude a 2D closed sketch profile by a given distance along plane normal."""
+        pass
+
+    @abstractmethod
+    def revolve_profile(self, profile: SketchProfile, angle_deg: float, axis: str = "Y", plane: Optional[SketchPlane] = None) -> CADShape:
+        """Revolve a 2D closed sketch profile around an axis by a given angle in degrees."""
         pass
 
     @abstractmethod
@@ -68,6 +78,11 @@ class CADBackend(ABC):
     @abstractmethod
     def chamfer(self, shape: CADShape, distance: float) -> CADShape:
         """Apply chamfer with given distance to outer edges."""
+        pass
+
+    @abstractmethod
+    def pattern_linear(self, shape: CADShape, count_x: int, count_y: int, spacing_x: float, spacing_y: float) -> CADShape:
+        """Create linear pattern duplication of a solid shape."""
         pass
 
     @abstractmethod

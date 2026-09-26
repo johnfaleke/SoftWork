@@ -9,6 +9,8 @@ from softwork.cad.backend import CADBackend
 from softwork.cad.direct_backend import DirectGeometryBackend
 from softwork.cad.geometry import MeshData
 from softwork.cad.topology import CADShape
+from softwork.sketch.profile import SketchProfile
+from softwork.sketch.plane import SketchPlane
 
 
 class CadQueryBackend(CADBackend):
@@ -62,6 +64,46 @@ class CadQueryBackend(CADBackend):
                 metadata={"radius": radius, "height": height, "mesh": mesh},
             )
         return self._fallback.create_cylinder(radius, height, center)
+
+    def extrude_profile(self, profile: SketchProfile, distance: float, plane: Optional[SketchPlane] = None) -> CADShape:
+        if self._has_cadquery and self._cq is not None:
+            try:
+                pts = [(p.u, p.v) for p in profile.outer_loop]
+                pl_name = plane.plane_type.value if plane else "XY"
+                wp = self._cq.Workplane(pl_name).polyline(pts).close().extrude(distance)
+                mesh = self._cq_to_mesh(wp)
+                return CADShape(
+                    id=f"cq_extrude_{uuid.uuid4().hex[:8]}",
+                    shape_type="extrude",
+                    native_handle=wp,
+                    volume=profile.area() * distance,
+                    is_valid=True,
+                    metadata={"distance": distance, "mesh": mesh, "profile": profile},
+                )
+            except Exception:
+                pass
+        return self._fallback.extrude_profile(profile, distance, plane)
+
+    def revolve_profile(self, profile: SketchProfile, angle_deg: float, axis: str = "Y", plane: Optional[SketchPlane] = None) -> CADShape:
+        if self._has_cadquery and self._cq is not None:
+            try:
+                pts = [(p.u, p.v) for p in profile.outer_loop]
+                wp = self._cq.Workplane("XY").polyline(pts).close().revolve(angle_deg, (0, 0, 0), (0, 1, 0))
+                mesh = self._cq_to_mesh(wp)
+                return CADShape(
+                    id=f"cq_revolve_{uuid.uuid4().hex[:8]}",
+                    shape_type="revolve",
+                    native_handle=wp,
+                    volume=profile.area() * 20.0,
+                    is_valid=True,
+                    metadata={"angle_deg": angle_deg, "mesh": mesh},
+                )
+            except Exception:
+                pass
+        return self._fallback.revolve_profile(profile, angle_deg, axis, plane)
+
+    def pattern_linear(self, shape: CADShape, count_x: int, count_y: int, spacing_x: float, spacing_y: float) -> CADShape:
+        return self._fallback.pattern_linear(shape, count_x, count_y, spacing_x, spacing_y)
 
     def create_plate_with_holes(
         self,
@@ -205,7 +247,6 @@ class CadQueryBackend(CADBackend):
 
     def _cq_to_mesh(self, cq_obj: Any, tolerance: float = 0.1) -> MeshData:
         try:
-            # CadQuery to tessellated triangles
             tess = cq_obj.val().tessellate(tolerance)
             vertices = [(v.x, v.y, v.z) for v in tess[0]]
             faces = [tuple(f) for f in tess[1]]
