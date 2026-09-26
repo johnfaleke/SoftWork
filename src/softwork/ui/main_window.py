@@ -1,13 +1,14 @@
 """
-SoftWork Main Window Desktop Interface.
-Integrates 3D Viewport, Feature Tree, 2D Sketching, Extrusions, Hole Wizard, Shell, AI Copilot, Dynamic Themes, and Workspace Settings.
+SoftWork Main Window Desktop Interface (IDE Architecture).
+Integrates Modern IDE Activity Bar, Draggable Floating AI Copilot HUD, 3D Viewport,
+Feature Tree, 2D Sketching, Hole Wizard, Shell, and Workspace Settings.
 """
 from __future__ import annotations
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 from typing import Optional, Dict, Any, Tuple
 
-from softwork.ai.agent import CADAgent
+from softwork.ai.agent import CADAgent, AgentExecutionResult, AgentPlan
 from softwork.cad.geometry import MeshData
 from softwork.commands.feature_commands import (
     CreateBoxCommand,
@@ -30,18 +31,20 @@ from softwork.ui.theme import ThemeManager, ThemePalette, DARK_THEME
 from softwork.ui.workspace_settings import WorkspaceSettingsManager, WorkspaceSettings
 from softwork.ui.workspace_dialog import WorkspaceSettingsDialog
 from softwork.ui.viewport import CAD3DCanvas
+from softwork.ui.activity_bar import ActivityBar
+from softwork.ui.floating_copilot import FloatingAICopilot
 
 
 class MainWindow(tk.Tk):
     """
-    Primary desktop application window for SoftWork CAD.
+    Primary desktop application window for SoftWork CAD featuring a modern IDE layout.
     """
 
     def __init__(self, document: Optional[Document] = None) -> None:
         super().__init__()
-        self.title("SoftWork — AI-native Parametric CAD")
-        self.geometry("1320x840")
-        self.minsize(980, 620)
+        self.title("SoftWork CAD — Parametric 3D IDE")
+        self.geometry("1360x860")
+        self.minsize(1020, 640)
 
         # Settings and Theme Managers
         self.settings_manager = WorkspaceSettingsManager.get_instance()
@@ -61,12 +64,11 @@ class MainWindow(tk.Tk):
         self.document.add_change_listener(self._on_document_changed)
         self.theme_manager.add_listener(self._on_theme_changed)
 
-        # Build UI layout
+        # Build Modern IDE UI layout
         self._setup_styles()
         self._build_menu()
-        self._build_toolbar()
-        self._build_main_layout()
-        self._build_ai_command_bar()
+        self._build_ribbon_toolbar()
+        self._build_ide_workspace()
         self._build_status_bar()
 
         # Initial CAD solid generation proof
@@ -90,7 +92,7 @@ class MainWindow(tk.Tk):
         style.configure(".", background=th.bg_app, foreground=th.fg_primary, font=("Segoe UI", 9))
         style.configure("TFrame", background=th.bg_panel)
         style.configure("TLabelframe", background=th.bg_panel, foreground=th.fg_secondary, relief="flat")
-        style.configure("TLabelframe.Label", background=th.bg_panel, foreground=th.fg_accent, font=("Segoe UI", 10, "bold"))
+        style.configure("TLabelframe.Label", background=th.bg_panel, foreground=th.fg_accent, font=("Segoe UI", 9, "bold"))
         
         style.configure(
             "Treeview",
@@ -99,14 +101,15 @@ class MainWindow(tk.Tk):
             fieldbackground=th.bg_panel,
             rowheight=26,
             font=("Segoe UI", 9),
+            borderwidth=0,
         )
         style.map("Treeview", background=[("selected", th.accent_btn_bg)], foreground=[("selected", th.accent_btn_fg)])
         
         style.configure("TEntry", fieldbackground=th.bg_input, foreground=th.fg_primary, insertcolor=th.fg_accent)
-        style.configure("TButton", background=th.bg_card, foreground=th.fg_primary, relief="flat", padding=4, font=("Segoe UI", 9))
+        style.configure("TButton", background=th.bg_card, foreground=th.fg_primary, relief="flat", padding=[6, 4], font=("Segoe UI", 9))
         style.map("TButton", background=[("active", th.bg_hover), ("pressed", th.accent_btn_hover)])
         
-        style.configure("Accent.TButton", background=th.accent_btn_bg, foreground=th.accent_btn_fg, font=("Segoe UI", 9, "bold"))
+        style.configure("Accent.TButton", background=th.accent_btn_bg, foreground=th.accent_btn_fg, font=("Segoe UI", 9, "bold"), padding=[8, 4])
         style.map("Accent.TButton", background=[("active", th.accent_btn_hover)])
 
         style.configure("TNotebook", background=th.bg_panel, borderwidth=0)
@@ -163,6 +166,7 @@ class MainWindow(tk.Tk):
         menubar.add_cascade(label="View", menu=view_menu)
 
         ai_menu = tk.Menu(menubar, tearoff=0, bg=th.bg_panel, fg=th.fg_primary)
+        ai_menu.add_command(label="Toggle Floating AI Copilot", command=self._toggle_ai_copilot)
         ai_menu.add_command(label="⚙️ Configure Cloud AI Keys (Gemini / Claude / OpenAI)...", command=self._action_configure_api_keys)
         ai_menu.add_separator()
         ai_menu.add_command(label="Run Mounting Plate Flow", command=self._action_run_demo_flow)
@@ -172,15 +176,15 @@ class MainWindow(tk.Tk):
         self.config(menu=menubar)
         self.menubar = menubar
 
-    def _build_toolbar(self) -> None:
+    def _build_ribbon_toolbar(self) -> None:
         th = self.theme
-        self.toolbar = tk.Frame(self, bg=th.bg_card, height=44, padx=8, pady=4)
+        self.toolbar = tk.Frame(self, bg=th.bg_panel, height=42, padx=8, pady=4, highlightbackground=th.border, highlightthickness=1)
         self.toolbar.pack(side=tk.TOP, fill=tk.X)
 
+        # Modeling tools group
         btn_sk = ttk.Button(self.toolbar, text="✏️ Sketch", command=lambda: self._action_create_sketch("XY"))
         btn_sk.pack(side=tk.LEFT, padx=2)
 
-        # Drawing Mode Selector
         btn_mode_sel = ttk.Button(self.toolbar, text="👆 Select", command=lambda: self._set_draw_mode("SELECT"))
         btn_mode_sel.pack(side=tk.LEFT, padx=2)
 
@@ -193,25 +197,44 @@ class MainWindow(tk.Tk):
         btn_draw_line = ttk.Button(self.toolbar, text="╱ Line", command=lambda: self._set_draw_mode("DRAW_LINE"))
         btn_draw_line.pack(side=tk.LEFT, padx=2)
 
+        # Separator
+        sep1 = tk.Frame(self.toolbar, bg=th.border, width=1, height=24)
+        sep1.pack(side=tk.LEFT, padx=6, fill=tk.Y)
+
         btn_ext = ttk.Button(self.toolbar, text="⬆️ Extrude", command=self._action_extrude_sketch)
-        btn_ext.pack(side=tk.LEFT, padx=3)
+        btn_ext.pack(side=tk.LEFT, padx=2)
 
         btn_rev = ttk.Button(self.toolbar, text="🔁 Revolve", command=self._action_revolve_sketch)
-        btn_rev.pack(side=tk.LEFT, padx=3)
+        btn_rev.pack(side=tk.LEFT, padx=2)
 
         btn_hole = ttk.Button(self.toolbar, text="🔩 Hole", command=self._action_add_hole_wizard)
-        btn_hole.pack(side=tk.LEFT, padx=3)
+        btn_hole.pack(side=tk.LEFT, padx=2)
 
         btn_shell = ttk.Button(self.toolbar, text="🐚 Shell", command=self._action_add_shell)
-        btn_shell.pack(side=tk.LEFT, padx=3)
+        btn_shell.pack(side=tk.LEFT, padx=2)
 
         btn_box = ttk.Button(self.toolbar, text="➕ Box", command=self._action_create_box)
-        btn_box.pack(side=tk.LEFT, padx=3)
+        btn_box.pack(side=tk.LEFT, padx=2)
 
         btn_plate = ttk.Button(self.toolbar, text="➕ Plate", command=self._action_create_plate)
-        btn_plate.pack(side=tk.LEFT, padx=3)
+        btn_plate.pack(side=tk.LEFT, padx=2)
 
-        # Right Side Tools: Settings, Undo/Redo (Clean preferences entry without toggle button)
+        # Right tools
+        btn_copilot_toggle = tk.Button(
+            self.toolbar,
+            text="✨ AI Copilot",
+            bg=th.bg_hover,
+            fg=th.fg_accent,
+            activebackground=th.accent_btn_bg,
+            activeforeground=th.accent_btn_fg,
+            bd=0,
+            font=("Segoe UI", 8, "bold"),
+            padx=8,
+            pady=3,
+            command=self._toggle_ai_copilot,
+        )
+        btn_copilot_toggle.pack(side=tk.RIGHT, padx=4)
+
         btn_settings = ttk.Button(self.toolbar, text="⚙️ Settings", command=self._action_open_settings)
         btn_settings.pack(side=tk.RIGHT, padx=3)
 
@@ -221,16 +244,41 @@ class MainWindow(tk.Tk):
         btn_undo = ttk.Button(self.toolbar, text="⟲ Undo", command=self._action_undo)
         btn_undo.pack(side=tk.RIGHT, padx=2)
 
-    def _build_main_layout(self) -> None:
+    def _build_ide_workspace(self) -> None:
         th = self.theme
-        self.main_pane = tk.PanedWindow(self, orient=tk.HORIZONTAL, bg=th.bg_app, sashrelief=tk.FLAT, sashwidth=4)
-        self.main_pane.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+        
+        # Workspace container
+        self.workspace_frame = tk.Frame(self, bg=th.bg_app)
+        self.workspace_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
 
-        # Left Panel: Feature Tree
-        self.left_frame = ttk.LabelFrame(self.main_pane, text="MODEL TREE", padding=6)
-        self.main_pane.add(self.left_frame, width=270)
+        # 1. Left Vertical Activity Bar
+        self.activity_bar = ActivityBar(
+            self.workspace_frame,
+            on_tab_changed=self._on_activity_tab_changed,
+            on_settings_clicked=self._action_open_settings,
+            on_ai_clicked=self._toggle_ai_copilot,
+            theme=th,
+        )
+        self.activity_bar.pack(side=tk.LEFT, fill=tk.Y)
 
-        self.tree = ttk.Treeview(self.left_frame, columns=("Type", "Status"), show="tree headings")
+        # 2. Main Horizontal Split Panes
+        self.main_pane = tk.PanedWindow(self.workspace_frame, orient=tk.HORIZONTAL, bg=th.bg_app, sashrelief=tk.FLAT, sashwidth=3)
+        self.main_pane.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        # Left Sidebar (Model Tree & Tools)
+        self.left_sidebar = tk.Frame(self.main_pane, bg=th.bg_panel, width=280)
+        self.main_pane.add(self.left_sidebar, width=280)
+
+        # Sidebar Header
+        self.sidebar_header = tk.Frame(self.left_sidebar, bg=th.bg_card, height=28, padx=8, pady=4)
+        self.sidebar_header.pack(fill=tk.X)
+        self.lbl_sidebar_title = tk.Label(self.sidebar_header, text="MODEL TREE", font=("Segoe UI", 9, "bold"), bg=th.bg_card, fg=th.fg_accent)
+        self.lbl_sidebar_title.pack(side=tk.LEFT)
+
+        self.tree_container = tk.Frame(self.left_sidebar, bg=th.bg_panel, padx=4, pady=4)
+        self.tree_container.pack(fill=tk.BOTH, expand=True)
+
+        self.tree = ttk.Treeview(self.tree_container, columns=("Type", "Status"), show="tree headings")
         self.tree.heading("#0", text="Feature")
         self.tree.heading("Type", text="Type")
         self.tree.heading("Status", text="Status")
@@ -240,12 +288,25 @@ class MainWindow(tk.Tk):
         self.tree.pack(fill=tk.BOTH, expand=True)
         self.tree.bind("<<TreeviewSelect>>", self._on_tree_select)
 
-        # Center: 3D Viewport with face raycasting and interactive drawing callbacks
-        self.center_frame = tk.Frame(self.main_pane, bg=th.viewport_bg)
-        self.main_pane.add(self.center_frame, width=730)
+        # Center Viewport Area with Floating AI Copilot Widget
+        self.center_viewport_container = tk.Frame(self.main_pane, bg=th.viewport_bg)
+        self.main_pane.add(self.center_viewport_container, width=740)
 
+        # Breadcrumb Bar
+        self.breadcrumb_bar = tk.Frame(self.center_viewport_container, bg=th.bg_panel, height=24, padx=8, pady=2)
+        self.breadcrumb_bar.pack(fill=tk.X)
+        self.lbl_breadcrumb = tk.Label(
+            self.breadcrumb_bar,
+            text="Workspace > Part 1 > Active Solid",
+            bg=th.bg_panel,
+            fg=th.fg_secondary,
+            font=("Segoe UI", 8),
+        )
+        self.lbl_breadcrumb.pack(side=tk.LEFT)
+
+        # 3D Viewport Canvas
         self.viewport = CAD3DCanvas(
-            self.center_frame,
+            self.center_viewport_container,
             on_face_selected=self._on_face_picked,
             on_shape_drawn=self._on_viewport_shape_drawn,
             theme=self.theme,
@@ -253,42 +314,68 @@ class MainWindow(tk.Tk):
         )
         self.viewport.pack(fill=tk.BOTH, expand=True)
 
-        # Right Panel: Properties Inspector
-        self.right_frame = ttk.LabelFrame(self.main_pane, text="PROPERTIES", padding=6)
-        self.main_pane.add(self.right_frame, width=310)
+        # Hovering / Draggable Floating AI Copilot placed directly over the 3D canvas
+        self.floating_copilot = FloatingAICopilot(
+            self.viewport,
+            agent=self.agent,
+            on_plan_preview=self._on_copilot_plan_preview,
+            on_prompt_executed=self._on_copilot_prompt_executed,
+            theme=self.theme,
+        )
+        self.floating_copilot.place(x=24, y=48)
 
-        self.props_container = tk.Frame(self.right_frame, bg=th.bg_panel)
+        # Right Sidebar: Properties Inspector
+        self.right_sidebar = tk.Frame(self.main_pane, bg=th.bg_panel, width=300)
+        self.main_pane.add(self.right_sidebar, width=300)
+
+        self.prop_header = tk.Frame(self.right_sidebar, bg=th.bg_card, height=28, padx=8, pady=4)
+        self.prop_header.pack(fill=tk.X)
+        tk.Label(self.prop_header, text="PROPERTIES", font=("Segoe UI", 9, "bold"), bg=th.bg_card, fg=th.fg_accent).pack(side=tk.LEFT)
+
+        self.props_container = tk.Frame(self.right_sidebar, bg=th.bg_panel, padx=8, pady=8)
         self.props_container.pack(fill=tk.BOTH, expand=True)
-
-    def _build_ai_command_bar(self) -> None:
-        th = self.theme
-        self.ai_frame = tk.Frame(self, bg=th.bg_card, padx=10, pady=8)
-        self.ai_frame.pack(side=tk.BOTTOM, fill=tk.X)
-
-        self.ai_lbl = tk.Label(self.ai_frame, text="✨ SoftWork AI Copilot:", bg=th.bg_card, fg=th.fg_accent, font=("Segoe UI", 10, "bold"))
-        self.ai_lbl.pack(side=tk.LEFT, padx=(0, 8))
-
-        self.ai_entry = tk.Entry(self.ai_frame, bg=th.bg_input, fg=th.fg_primary, insertbackground=th.fg_accent, relief="flat", font=("Segoe UI", 10))
-        self.ai_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=4, ipady=4)
-        self.ai_entry.insert(0, "Create sketch on XY plane")
-        self.ai_entry.bind("<Return>", lambda e: self._action_submit_ai_prompt())
-
-        btn_send = ttk.Button(self.ai_frame, text="Ask AI", style="Accent.TButton", command=self._action_submit_ai_prompt)
-        btn_send.pack(side=tk.RIGHT, padx=4)
 
     def _build_status_bar(self) -> None:
         th = self.theme
         self.status_bar = tk.Label(
             self,
             text="Ready | SoftWork CAD Kernel Active",
-            bg=th.bg_app,
+            bg=th.bg_panel,
             fg=th.fg_secondary,
             anchor=tk.W,
-            padx=10,
+            padx=12,
             pady=4,
             font=("Segoe UI", 8),
+            highlightbackground=th.border,
+            highlightthickness=1,
         )
         self.status_bar.pack(side=tk.BOTTOM, fill=tk.X)
+
+    def _on_activity_tab_changed(self, tab_id: str) -> None:
+        if tab_id == "tree":
+            self.lbl_sidebar_title.config(text="MODEL TREE")
+        elif tab_id == "tools":
+            self.lbl_sidebar_title.config(text="CAD TOOLS & PRIMITIVES")
+        elif tab_id == "props":
+            self.lbl_sidebar_title.config(text="INSPECTOR")
+
+    def _toggle_ai_copilot(self) -> None:
+        if self.floating_copilot.winfo_ismapped():
+            self.floating_copilot.place_forget()
+        else:
+            self.floating_copilot.place(x=self.floating_copilot.pos_x, y=self.floating_copilot.pos_y)
+
+    def _on_copilot_plan_preview(self, plan: AgentPlan) -> None:
+        if plan.ghost_mesh:
+            self.viewport.set_ghost_mesh(plan.ghost_mesh, delta_vol=plan.predicted_delta_vol)
+
+    def _on_copilot_prompt_executed(self, result: AgentExecutionResult) -> None:
+        if result.success:
+            self.status_bar.config(text=f"✨ AI: {result.explanation}", fg=self.theme.fg_accent)
+        else:
+            self.status_bar.config(text=f"⚠️ AI Error: {result.error_message}", fg=self.theme.color_error)
+            messagebox.showwarning("CAD Agent Notice", result.error_message)
+        self._refresh_all()
 
     def _switch_theme(self, theme_name: str) -> None:
         self.theme_manager.set_theme(theme_name)
@@ -301,17 +388,25 @@ class MainWindow(tk.Tk):
         self._setup_styles()
 
         # Update container backgrounds
-        self.toolbar.configure(bg=new_theme.bg_card)
+        self.toolbar.configure(bg=new_theme.bg_panel, highlightbackground=new_theme.border)
+        self.workspace_frame.configure(bg=new_theme.bg_app)
         self.main_pane.configure(bg=new_theme.bg_app)
-        self.center_frame.configure(bg=new_theme.viewport_bg)
+        self.left_sidebar.configure(bg=new_theme.bg_panel)
+        self.sidebar_header.configure(bg=new_theme.bg_card)
+        self.lbl_sidebar_title.configure(bg=new_theme.bg_card, fg=new_theme.fg_accent)
+        self.tree_container.configure(bg=new_theme.bg_panel)
+        self.center_viewport_container.configure(bg=new_theme.viewport_bg)
+        self.breadcrumb_bar.configure(bg=new_theme.bg_panel)
+        self.lbl_breadcrumb.configure(bg=new_theme.bg_panel, fg=new_theme.fg_secondary)
+        self.right_sidebar.configure(bg=new_theme.bg_panel)
+        self.prop_header.configure(bg=new_theme.bg_card)
         self.props_container.configure(bg=new_theme.bg_panel)
-        self.ai_frame.configure(bg=new_theme.bg_card)
-        self.ai_lbl.configure(bg=new_theme.bg_card, fg=new_theme.fg_accent)
-        self.ai_entry.configure(bg=new_theme.bg_input, fg=new_theme.fg_primary, insertbackground=new_theme.fg_accent)
-        self.status_bar.configure(bg=new_theme.bg_app, fg=new_theme.fg_secondary)
+        self.status_bar.configure(bg=new_theme.bg_panel, fg=new_theme.fg_secondary, highlightbackground=new_theme.border)
 
-        # Update viewport
+        # Update sub-widgets
+        self.activity_bar.apply_theme(new_theme)
         self.viewport.apply_theme(new_theme)
+        self.floating_copilot.apply_theme(new_theme)
         self._build_menu()
         self._refresh_all()
 
@@ -400,6 +495,10 @@ class MainWindow(tk.Tk):
             )
 
         self._refresh_properties()
+
+        # Update breadcrumb
+        feat_name = self.document.active_part.features[-1].name if self.document.active_part.features else "Empty"
+        self.lbl_breadcrumb.config(text=f"{self.document.name} > {self.document.active_part.name} > {feat_name}")
 
         val = self.document.latest_validation
         if val and not val.is_valid:
@@ -498,24 +597,6 @@ class MainWindow(tk.Tk):
             feat_id = selected[0]
             self.document.selection.select_feature(feat_id)
             self._refresh_properties()
-
-    def _action_submit_ai_prompt(self) -> None:
-        prompt = self.ai_entry.get().strip()
-        if not prompt:
-            return
-
-        plan = self.agent.plan_prompt(prompt)
-        if plan.ghost_mesh:
-            self.viewport.set_ghost_mesh(plan.ghost_mesh, delta_vol=plan.predicted_delta_vol)
-
-        result = self.agent.execute_prompt(prompt)
-        if result.success:
-            self.status_bar.config(text=f"✨ AI: {result.explanation}", fg=self.theme.fg_accent)
-        else:
-            self.status_bar.config(text=f"⚠️ AI Error: {result.error_message}", fg=self.theme.color_error)
-            messagebox.showwarning("CAD Agent Notice", result.error_message)
-
-        self._refresh_all()
 
     def _action_configure_api_keys(self) -> None:
         from softwork.ai.provider import HeuristicEngineProvider, GeminiProvider, OpenAIProvider, AnthropicProvider
