@@ -1,6 +1,6 @@
 """
-SoftWork Main Window Desktop Interface for v0.2.
-Integrates 3D Viewport with Face Picking, Feature Tree, 2D Sketching, Extrusions, Revolutions, and AI Copilot.
+SoftWork Main Window Desktop Interface.
+Integrates 3D Viewport, Feature Tree, 2D Sketching, Extrusions, Hole Wizard, Shell, AI Copilot, Dynamic Themes, and Workspace Settings.
 """
 from __future__ import annotations
 import tkinter as tk
@@ -15,39 +15,54 @@ from softwork.commands.feature_commands import (
     CreateSketchCommand,
     ExtrudeSketchCommand,
     RevolveSketchCommand,
+    AddHoleWizardCommand,
+    AddShellCommand,
     AddPatternCommand,
     AddChamferCommand,
     AddFilletCommand,
 )
 from softwork.commands.parameter_commands import SetParameterCommand
 from softwork.core.document import Document
-from softwork.core.feature import Feature, SketchFeature, ExtrudeFeature, RevolveFeature, PatternFeature, ChamferFeature
+from softwork.core.feature import Feature, SketchFeature, ExtrudeFeature, RevolveFeature, PatternFeature, ChamferFeature, HoleWizardFeature, ShellFeature
 from softwork.document.serializer import save_document, load_document
 from softwork.sketch.plane import StandardPlane
+from softwork.ui.theme import ThemeManager, ThemePalette, DARK_THEME
+from softwork.ui.workspace_settings import WorkspaceSettingsManager, WorkspaceSettings
+from softwork.ui.workspace_dialog import WorkspaceSettingsDialog
 from softwork.ui.viewport import CAD3DCanvas
 
 
 class MainWindow(tk.Tk):
     """
-    Primary desktop application window for SoftWork v0.2.
+    Primary desktop application window for SoftWork CAD.
     """
 
     def __init__(self, document: Optional[Document] = None) -> None:
         super().__init__()
-        self.title("SoftWork — AI-native Parametric CAD (v0.2)")
-        self.geometry("1280x820")
-        self.minsize(960, 600)
-        self.configure(bg="#0B0F19")
+        self.title("SoftWork — AI-native Parametric CAD")
+        self.geometry("1320x840")
+        self.minsize(980, 620)
+
+        # Settings and Theme Managers
+        self.settings_manager = WorkspaceSettingsManager.get_instance()
+        self.theme_manager = ThemeManager.get_instance()
+        
+        # Load theme from persisted settings
+        saved_theme = self.settings_manager.settings.theme_name
+        if saved_theme in self.theme_manager.themes:
+            self.theme_manager.active_theme_name = saved_theme
+        self.theme: ThemePalette = self.theme_manager.current_theme
+
+        self.configure(bg=self.theme.bg_app)
 
         # Core CAD Document & AI Agent
         self.document: Document = document or Document(name="Untitled.softwork")
         self.agent: CADAgent = CADAgent(self.document)
         self.document.add_change_listener(self._on_document_changed)
-
-        # Setup modern dark theme styles
-        self._setup_styles()
+        self.theme_manager.add_listener(self._on_theme_changed)
 
         # Build UI layout
+        self._setup_styles()
         self._build_menu()
         self._build_toolbar()
         self._build_main_layout()
@@ -68,25 +83,41 @@ class MainWindow(tk.Tk):
         self._refresh_all()
 
     def _setup_styles(self) -> None:
+        th = self.theme
         style = ttk.Style(self)
         style.theme_use("clam")
 
-        style.configure(".", background="#0B0F19", foreground="#F8FAFC", font=("Segoe UI", 9))
-        style.configure("TFrame", background="#0F172A")
-        style.configure("TLabelframe", background="#0F172A", foreground="#94A3B8", relief="flat")
-        style.configure("TLabelframe.Label", background="#0F172A", foreground="#38BDF8", font=("Segoe UI", 10, "bold"))
-        style.configure("Treeview", background="#0F172A", foreground="#E2E8F0", fieldbackground="#0F172A", rowheight=26)
-        style.map("Treeview", background=[("selected", "#0284C7")], foreground=[("selected", "#FFFFFF")])
-        style.configure("TEntry", fieldbackground="#1E293B", foreground="#F8FAFC", insertcolor="#38BDF8")
-        style.configure("TButton", background="#1E293B", foreground="#F8FAFC", relief="flat", padding=4)
-        style.map("TButton", background=[("active", "#0284C7"), ("pressed", "#0369A1")])
-        style.configure("Accent.TButton", background="#0284C7", foreground="#FFFFFF", font=("Segoe UI", 9, "bold"))
-        style.map("Accent.TButton", background=[("active", "#0369A1")])
+        style.configure(".", background=th.bg_app, foreground=th.fg_primary, font=("Segoe UI", 9))
+        style.configure("TFrame", background=th.bg_panel)
+        style.configure("TLabelframe", background=th.bg_panel, foreground=th.fg_secondary, relief="flat")
+        style.configure("TLabelframe.Label", background=th.bg_panel, foreground=th.fg_accent, font=("Segoe UI", 10, "bold"))
+        
+        style.configure(
+            "Treeview",
+            background=th.bg_panel,
+            foreground=th.fg_primary,
+            fieldbackground=th.bg_panel,
+            rowheight=26,
+            font=("Segoe UI", 9),
+        )
+        style.map("Treeview", background=[("selected", th.accent_btn_bg)], foreground=[("selected", th.accent_btn_fg)])
+        
+        style.configure("TEntry", fieldbackground=th.bg_input, foreground=th.fg_primary, insertcolor=th.fg_accent)
+        style.configure("TButton", background=th.bg_card, foreground=th.fg_primary, relief="flat", padding=4, font=("Segoe UI", 9))
+        style.map("TButton", background=[("active", th.bg_hover), ("pressed", th.accent_btn_hover)])
+        
+        style.configure("Accent.TButton", background=th.accent_btn_bg, foreground=th.accent_btn_fg, font=("Segoe UI", 9, "bold"))
+        style.map("Accent.TButton", background=[("active", th.accent_btn_hover)])
+
+        style.configure("TNotebook", background=th.bg_panel, borderwidth=0)
+        style.configure("TNotebook.Tab", background=th.bg_card, foreground=th.fg_primary, padding=[10, 4])
+        style.map("TNotebook.Tab", background=[("selected", th.accent_btn_bg)], foreground=[("selected", th.accent_btn_fg)])
 
     def _build_menu(self) -> None:
-        menubar = tk.Menu(self, bg="#0F172A", fg="#E2E8F0", activebackground="#0284C7", activeforeground="#FFFFFF")
+        th = self.theme
+        menubar = tk.Menu(self, bg=th.bg_panel, fg=th.fg_primary, activebackground=th.accent_btn_bg, activeforeground=th.accent_btn_fg)
 
-        file_menu = tk.Menu(menubar, tearoff=0, bg="#0F172A", fg="#E2E8F0")
+        file_menu = tk.Menu(menubar, tearoff=0, bg=th.bg_panel, fg=th.fg_primary)
         file_menu.add_command(label="New Part", command=self._action_new_document, accelerator="Ctrl+N")
         file_menu.add_command(label="Open .softwork...", command=self._action_open_document, accelerator="Ctrl+O")
         file_menu.add_command(label="Save...", command=self._action_save_document, accelerator="Ctrl+S")
@@ -97,12 +128,14 @@ class MainWindow(tk.Tk):
         file_menu.add_command(label="Exit", command=self.quit)
         menubar.add_cascade(label="File", menu=file_menu)
 
-        edit_menu = tk.Menu(menubar, tearoff=0, bg="#0F172A", fg="#E2E8F0")
+        edit_menu = tk.Menu(menubar, tearoff=0, bg=th.bg_panel, fg=th.fg_primary)
         edit_menu.add_command(label="Undo", command=self._action_undo, accelerator="Ctrl+Z")
         edit_menu.add_command(label="Redo", command=self._action_redo, accelerator="Ctrl+Y")
+        edit_menu.add_separator()
+        edit_menu.add_command(label="⚙️ Workspace Settings...", command=self._action_open_settings)
         menubar.add_cascade(label="Edit", menu=edit_menu)
 
-        design_menu = tk.Menu(menubar, tearoff=0, bg="#0F172A", fg="#E2E8F0")
+        design_menu = tk.Menu(menubar, tearoff=0, bg=th.bg_panel, fg=th.fg_primary)
         design_menu.add_command(label="Create 2D Sketch (XY)", command=lambda: self._action_create_sketch("XY"))
         design_menu.add_command(label="Extrude Active Sketch", command=self._action_extrude_sketch)
         design_menu.add_command(label="Revolve Active Sketch", command=self._action_revolve_sketch)
@@ -112,107 +145,181 @@ class MainWindow(tk.Tk):
         design_menu.add_command(label="Add Chamfer", command=self._action_add_chamfer)
         menubar.add_cascade(label="Design", menu=design_menu)
 
-        view_menu = tk.Menu(menubar, tearoff=0, bg="#0F172A", fg="#E2E8F0")
-        view_menu.add_command(label="Reset Camera (Isometric)", command=lambda: self.viewport.reset_view())
+        view_menu = tk.Menu(menubar, tearoff=0, bg=th.bg_panel, fg=th.fg_primary)
+        view_menu.add_command(label="Isometric View", command=lambda: self.viewport.set_view_isometric())
+        view_menu.add_command(label="Top View", command=lambda: self.viewport.set_view_top())
+        view_menu.add_command(label="Front View", command=lambda: self.viewport.set_view_front())
+        view_menu.add_command(label="Right View", command=lambda: self.viewport.set_view_right())
+        view_menu.add_separator()
+        view_menu.add_command(label="Reset Camera", command=lambda: self.viewport.reset_view())
+        view_menu.add_separator()
+        view_menu.add_command(label="Toggle Dark/Light Mode", command=self._action_toggle_theme)
         menubar.add_cascade(label="View", menu=view_menu)
 
-        ai_menu = tk.Menu(menubar, tearoff=0, bg="#0F172A", fg="#E2E8F0")
+        ai_menu = tk.Menu(menubar, tearoff=0, bg=th.bg_panel, fg=th.fg_primary)
         ai_menu.add_command(label="⚙️ Configure Cloud AI Keys (Gemini / Claude / OpenAI)...", command=self._action_configure_api_keys)
         ai_menu.add_separator()
-        ai_menu.add_command(label="Run MVP Demo Flow (Mounting Plate)", command=self._action_run_demo_flow)
-        ai_menu.add_command(label="Run v0.2 Sketch & Extrude Flow", command=self._action_run_sketch_demo)
+        ai_menu.add_command(label="Run Mounting Plate Flow", command=self._action_run_demo_flow)
+        ai_menu.add_command(label="Run Sketch & Extrude Flow", command=self._action_run_sketch_demo)
         menubar.add_cascade(label="AI", menu=ai_menu)
 
         self.config(menu=menubar)
+        self.menubar = menubar
 
     def _build_toolbar(self) -> None:
-        toolbar = tk.Frame(self, bg="#1E293B", height=42, padx=8, pady=4)
-        toolbar.pack(side=tk.TOP, fill=tk.X)
+        th = self.theme
+        self.toolbar = tk.Frame(self, bg=th.bg_card, height=44, padx=8, pady=4)
+        self.toolbar.pack(side=tk.TOP, fill=tk.X)
 
-        btn_sk = ttk.Button(toolbar, text="✏️ New Sketch", command=lambda: self._action_create_sketch("XY"))
+        btn_sk = ttk.Button(self.toolbar, text="✏️ Sketch", command=lambda: self._action_create_sketch("XY"))
         btn_sk.pack(side=tk.LEFT, padx=2)
 
         # Drawing Mode Selector
-        btn_mode_sel = ttk.Button(toolbar, text="👆 Select", command=lambda: self._set_draw_mode("SELECT"))
+        btn_mode_sel = ttk.Button(self.toolbar, text="👆 Select", command=lambda: self._set_draw_mode("SELECT"))
         btn_mode_sel.pack(side=tk.LEFT, padx=2)
 
-        btn_draw_rect = ttk.Button(toolbar, text="▭ Rect", command=lambda: self._set_draw_mode("DRAW_RECTANGLE"))
+        btn_draw_rect = ttk.Button(self.toolbar, text="▭ Rect", command=lambda: self._set_draw_mode("DRAW_RECTANGLE"))
         btn_draw_rect.pack(side=tk.LEFT, padx=2)
 
-        btn_draw_circ = ttk.Button(toolbar, text="⭕ Circle", command=lambda: self._set_draw_mode("DRAW_CIRCLE"))
+        btn_draw_circ = ttk.Button(self.toolbar, text="⭕ Circle", command=lambda: self._set_draw_mode("DRAW_CIRCLE"))
         btn_draw_circ.pack(side=tk.LEFT, padx=2)
 
-        btn_draw_line = ttk.Button(toolbar, text="╱ Line", command=lambda: self._set_draw_mode("DRAW_LINE"))
+        btn_draw_line = ttk.Button(self.toolbar, text="╱ Line", command=lambda: self._set_draw_mode("DRAW_LINE"))
         btn_draw_line.pack(side=tk.LEFT, padx=2)
 
-        btn_ext = ttk.Button(toolbar, text="⬆️ Extrude", command=self._action_extrude_sketch)
+        btn_ext = ttk.Button(self.toolbar, text="⬆️ Extrude", command=self._action_extrude_sketch)
         btn_ext.pack(side=tk.LEFT, padx=3)
 
-        btn_rev = ttk.Button(toolbar, text="🔁 Revolve", command=self._action_revolve_sketch)
+        btn_rev = ttk.Button(self.toolbar, text="🔁 Revolve", command=self._action_revolve_sketch)
         btn_rev.pack(side=tk.LEFT, padx=3)
 
-        btn_hole = ttk.Button(toolbar, text="🔩 Hole", command=self._action_add_hole_wizard)
+        btn_hole = ttk.Button(self.toolbar, text="🔩 Hole", command=self._action_add_hole_wizard)
         btn_hole.pack(side=tk.LEFT, padx=3)
 
-        btn_shell = ttk.Button(toolbar, text="🐚 Shell", command=self._action_add_shell)
+        btn_shell = ttk.Button(self.toolbar, text="🐚 Shell", command=self._action_add_shell)
         btn_shell.pack(side=tk.LEFT, padx=3)
 
-        btn_box = ttk.Button(toolbar, text="➕ Box", command=self._action_create_box)
+        btn_box = ttk.Button(self.toolbar, text="➕ Box", command=self._action_create_box)
         btn_box.pack(side=tk.LEFT, padx=3)
 
-        btn_plate = ttk.Button(toolbar, text="➕ Plate", command=self._action_create_plate)
+        btn_plate = ttk.Button(self.toolbar, text="➕ Plate", command=self._action_create_plate)
         btn_plate.pack(side=tk.LEFT, padx=3)
 
-        btn_step = ttk.Button(toolbar, text="💾 STEP", command=self._action_export_step)
-        btn_step.pack(side=tk.LEFT, padx=3)
+        # Right Side Tools: Theme Quick Toggle, Settings, Undo/Redo
+        self.btn_theme_toggle = ttk.Button(self.toolbar, text="☀️ Light" if th.is_dark else "🌙 Dark", command=self._action_toggle_theme)
+        self.btn_theme_toggle.pack(side=tk.RIGHT, padx=3)
 
-        btn_stl = ttk.Button(toolbar, text="💾 STL", command=self._action_export_stl)
-        btn_stl.pack(side=tk.LEFT, padx=3)
+        btn_settings = ttk.Button(self.toolbar, text="⚙️ Settings", command=self._action_open_settings)
+        btn_settings.pack(side=tk.RIGHT, padx=3)
 
-        btn_undo = ttk.Button(toolbar, text="⟲ Undo", command=self._action_undo)
-        btn_undo.pack(side=tk.RIGHT, padx=3)
+        btn_redo = ttk.Button(self.toolbar, text="⟳ Redo", command=self._action_redo)
+        btn_redo.pack(side=tk.RIGHT, padx=2)
 
-        btn_redo = ttk.Button(toolbar, text="⟳ Redo", command=self._action_redo)
-        btn_redo.pack(side=tk.RIGHT, padx=3)
+        btn_undo = ttk.Button(self.toolbar, text="⟲ Undo", command=self._action_undo)
+        btn_undo.pack(side=tk.RIGHT, padx=2)
 
     def _build_main_layout(self) -> None:
-        main_pane = tk.PanedWindow(self, orient=tk.HORIZONTAL, bg="#0B0F19", sashrelief=tk.FLAT, sashwidth=4)
-        main_pane.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+        th = self.theme
+        self.main_pane = tk.PanedWindow(self, orient=tk.HORIZONTAL, bg=th.bg_app, sashrelief=tk.FLAT, sashwidth=4)
+        self.main_pane.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
 
         # Left Panel: Feature Tree
-        left_frame = ttk.LabelFrame(main_pane, text="MODEL TREE", padding=6)
-        main_pane.add(left_frame, width=260)
+        self.left_frame = ttk.LabelFrame(self.main_pane, text="MODEL TREE", padding=6)
+        self.main_pane.add(self.left_frame, width=270)
 
-        self.tree = ttk.Treeview(left_frame, columns=("Type", "Status"), show="tree headings")
+        self.tree = ttk.Treeview(self.left_frame, columns=("Type", "Status"), show="tree headings")
         self.tree.heading("#0", text="Feature")
         self.tree.heading("Type", text="Type")
         self.tree.heading("Status", text="Status")
-        self.tree.column("#0", width=130)
+        self.tree.column("#0", width=140)
         self.tree.column("Type", width=70)
         self.tree.column("Status", width=50)
         self.tree.pack(fill=tk.BOTH, expand=True)
         self.tree.bind("<<TreeviewSelect>>", self._on_tree_select)
 
         # Center: 3D Viewport with face raycasting and interactive drawing callbacks
-        center_frame = tk.Frame(main_pane, bg="#0F172A")
-        main_pane.add(center_frame, width=720)
+        self.center_frame = tk.Frame(self.main_pane, bg=th.viewport_bg)
+        self.main_pane.add(self.center_frame, width=730)
 
         self.viewport = CAD3DCanvas(
-            center_frame,
+            self.center_frame,
             on_face_selected=self._on_face_picked,
             on_shape_drawn=self._on_viewport_shape_drawn,
+            theme=self.theme,
+            settings=self.settings_manager.settings,
         )
         self.viewport.pack(fill=tk.BOTH, expand=True)
 
         # Right Panel: Properties Inspector
-        right_frame = ttk.LabelFrame(main_pane, text="PROPERTIES", padding=6)
-        main_pane.add(right_frame, width=300)
+        self.right_frame = ttk.LabelFrame(self.main_pane, text="PROPERTIES", padding=6)
+        self.main_pane.add(self.right_frame, width=310)
 
-        self.props_container = tk.Frame(right_frame, bg="#0F172A")
+        self.props_container = tk.Frame(self.right_frame, bg=th.bg_panel)
         self.props_container.pack(fill=tk.BOTH, expand=True)
 
+    def _build_ai_command_bar(self) -> None:
+        th = self.theme
+        self.ai_frame = tk.Frame(self, bg=th.bg_card, padx=10, pady=8)
+        self.ai_frame.pack(side=tk.BOTTOM, fill=tk.X)
+
+        self.ai_lbl = tk.Label(self.ai_frame, text="✨ SoftWork AI Copilot:", bg=th.bg_card, fg=th.fg_accent, font=("Segoe UI", 10, "bold"))
+        self.ai_lbl.pack(side=tk.LEFT, padx=(0, 8))
+
+        self.ai_entry = tk.Entry(self.ai_frame, bg=th.bg_input, fg=th.fg_primary, insertbackground=th.fg_accent, relief="flat", font=("Segoe UI", 10))
+        self.ai_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=4, ipady=4)
+        self.ai_entry.insert(0, "Create sketch on XY plane")
+        self.ai_entry.bind("<Return>", lambda e: self._action_submit_ai_prompt())
+
+        btn_send = ttk.Button(self.ai_frame, text="Ask AI", style="Accent.TButton", command=self._action_submit_ai_prompt)
+        btn_send.pack(side=tk.RIGHT, padx=4)
+
+    def _build_status_bar(self) -> None:
+        th = self.theme
+        self.status_bar = tk.Label(
+            self,
+            text="Ready | SoftWork CAD Kernel Active",
+            bg=th.bg_app,
+            fg=th.fg_secondary,
+            anchor=tk.W,
+            padx=10,
+            pady=4,
+            font=("Segoe UI", 8),
+        )
+        self.status_bar.pack(side=tk.BOTTOM, fill=tk.X)
+
+    def _on_theme_changed(self, new_theme: ThemePalette) -> None:
+        self.theme = new_theme
+        self.configure(bg=new_theme.bg_app)
+        self._setup_styles()
+
+        # Update container backgrounds
+        self.toolbar.configure(bg=new_theme.bg_card)
+        self.main_pane.configure(bg=new_theme.bg_app)
+        self.center_frame.configure(bg=new_theme.viewport_bg)
+        self.props_container.configure(bg=new_theme.bg_panel)
+        self.ai_frame.configure(bg=new_theme.bg_card)
+        self.ai_lbl.configure(bg=new_theme.bg_card, fg=new_theme.fg_accent)
+        self.ai_entry.configure(bg=new_theme.bg_input, fg=new_theme.fg_primary, insertbackground=new_theme.fg_accent)
+        self.status_bar.configure(bg=new_theme.bg_app, fg=new_theme.fg_secondary)
+        self.btn_theme_toggle.configure(text="☀️ Light" if new_theme.is_dark else "🌙 Dark")
+
+        # Update viewport
+        self.viewport.apply_theme(new_theme)
+        self._build_menu()
+        self._refresh_all()
+
+    def _action_toggle_theme(self) -> None:
+        new_theme_name = self.theme_manager.toggle_dark_light()
+        self.settings_manager.settings.theme_name = new_theme_name
+        self.settings_manager.save_settings()
+
+    def _action_open_settings(self) -> None:
+        WorkspaceSettingsDialog(
+            self,
+            on_settings_applied=lambda settings, palette: self.viewport.apply_settings(settings),
+        )
+
     def _set_draw_mode(self, mode: str) -> None:
-        # Find active sketch plane
         active_plane = None
         for f in reversed(self.document.active_part.features):
             if isinstance(f, SketchFeature):
@@ -220,7 +327,7 @@ class MainWindow(tk.Tk):
                 break
         self.viewport.set_tool_mode(mode, active_plane=active_plane)
         mode_label = mode.replace("DRAW_", "").title() if mode != "SELECT" else "Select / Orbit"
-        self.status_bar.config(text=f"🎯 Tool Mode: {mode_label} | Click & Drag on 3D Viewport to sketch", fg="#38BDF8")
+        self.status_bar.config(text=f"🎯 Tool Mode: {mode_label} | Click & Drag on 3D Viewport to sketch", fg=self.theme.fg_accent)
 
     def _on_viewport_shape_drawn(self, shape_type: str, data: Dict[str, Any]) -> None:
         sk_feat = None
@@ -257,40 +364,12 @@ class MainWindow(tk.Tk):
 
             self.document.recompute()
             self._refresh_all()
-            self.status_bar.config(text=f"✏️ Added {shape_type.title()} to {sk_feat.name}", fg="#10B981")
-
-    def _build_ai_command_bar(self) -> None:
-        ai_frame = tk.Frame(self, bg="#1E293B", padx=10, pady=8)
-        ai_frame.pack(side=tk.BOTTOM, fill=tk.X)
-
-        lbl = tk.Label(ai_frame, text="✨ SoftWork AI Copilot:", bg="#1E293B", fg="#38BDF8", font=("Segoe UI", 10, "bold"))
-        lbl.pack(side=tk.LEFT, padx=(0, 8))
-
-        self.ai_entry = tk.Entry(ai_frame, bg="#0F172A", fg="#F8FAFC", insertbackground="#38BDF8", relief="flat", font=("Segoe UI", 10))
-        self.ai_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=4, ipady=4)
-        self.ai_entry.insert(0, "Create sketch on XY plane")
-        self.ai_entry.bind("<Return>", lambda e: self._action_submit_ai_prompt())
-
-        btn_send = ttk.Button(ai_frame, text="Ask AI", style="Accent.TButton", command=self._action_submit_ai_prompt)
-        btn_send.pack(side=tk.RIGHT, padx=4)
-
-    def _build_status_bar(self) -> None:
-        self.status_bar = tk.Label(
-            self,
-            text="Ready | SoftWork CAD Kernel Active",
-            bg="#0B0F19",
-            fg="#94A3B8",
-            anchor=tk.W,
-            padx=10,
-            pady=3,
-            font=("Segoe UI", 8),
-        )
-        self.status_bar.pack(side=tk.BOTTOM, fill=tk.X)
+            self.status_bar.config(text=f"✏️ Added {shape_type.title()} to {sk_feat.name}", fg=self.theme.color_success)
 
     def _on_face_picked(self, face_idx: int, normal: Tuple[float, float, float]) -> None:
         self.status_bar.config(
             text=f"📍 Selected Surface: Face #{face_idx} | Normal: ({normal[0]:.2f}, {normal[1]:.2f}, {normal[2]:.2f})",
-            fg="#F59E0B",
+            fg=self.theme.color_warning,
         )
 
     def _on_document_changed(self) -> None:
@@ -322,12 +401,12 @@ class MainWindow(tk.Tk):
 
         val = self.document.latest_validation
         if val and not val.is_valid:
-            self.status_bar.config(text=f"⚠️ Validation Issue: {val.issues[0].message}", fg="#EF4444")
+            self.status_bar.config(text=f"⚠️ Validation Issue: {val.issues[0].message}", fg=self.theme.color_error)
         else:
             vol = solid.volume if solid else 0.0
             num_sk = len(sketches)
             sk_info = f" | {num_sk} Sketch(es) active" if num_sk > 0 else ""
-            self.status_bar.config(text=f"✓ Solid Valid | Volume: {vol:,.1f} mm³{sk_info} | Backend: {self.document.backend.name()}", fg="#10B981")
+            self.status_bar.config(text=f"✓ Solid Valid | Volume: {vol:,.1f} mm³{sk_info} | Theme: {self.theme.name}", fg=self.theme.color_success)
 
     def _refresh_properties(self) -> None:
         for widget in self.props_container.winfo_children():
@@ -338,23 +417,24 @@ class MainWindow(tk.Tk):
             feat_id = self.document.active_part.features[-1].id
 
         feature = self.document.get_feature(feat_id) if feat_id else None
+        th = self.theme
         if not feature:
-            lbl = tk.Label(self.props_container, text="No feature selected", bg="#0F172A", fg="#64748B")
+            lbl = tk.Label(self.props_container, text="No feature selected", bg=th.bg_panel, fg=th.fg_muted)
             lbl.pack(pady=20)
             return
 
-        tk.Label(self.props_container, text=f"Feature: {feature.name}", bg="#0F172A", fg="#38BDF8", font=("Segoe UI", 11, "bold")).pack(anchor=tk.W, pady=(0, 10))
-        tk.Label(self.props_container, text=f"Type: {feature.feature_type.value.upper()}", bg="#0F172A", fg="#94A3B8").pack(anchor=tk.W)
+        tk.Label(self.props_container, text=f"Feature: {feature.name}", bg=th.bg_panel, fg=th.fg_accent, font=("Segoe UI", 11, "bold")).pack(anchor=tk.W, pady=(0, 10))
+        tk.Label(self.props_container, text=f"Type: {feature.feature_type.value.upper()}", bg=th.bg_panel, fg=th.fg_secondary).pack(anchor=tk.W)
 
         # Show sketch profile details if SketchFeature
         if isinstance(feature, SketchFeature):
-            tk.Label(self.props_container, text=f"Plane: {feature.sketch.plane.plane_type.value}", bg="#0F172A", fg="#E2E8F0").pack(anchor=tk.W, pady=4)
+            tk.Label(self.props_container, text=f"Plane: {feature.sketch.plane.plane_type.value}", bg=th.bg_panel, fg=th.fg_primary).pack(anchor=tk.W, pady=4)
             num_prof = len(feature.sketch.profiles)
             num_el = len(feature.sketch.elements)
             num_c = len(feature.sketch.constraints)
-            tk.Label(self.props_container, text=f"Elements: {num_el} | Loops: {num_prof} | Constraints: {num_c}", bg="#0F172A", fg="#10B981").pack(anchor=tk.W, pady=2)
+            tk.Label(self.props_container, text=f"Elements: {num_el} | Loops: {num_prof} | Constraints: {num_c}", bg=th.bg_panel, fg=th.color_success).pack(anchor=tk.W, pady=2)
             
-            btn_frame = tk.Frame(self.props_container, bg="#0F172A")
+            btn_frame = tk.Frame(self.props_container, bg=th.bg_panel)
             btn_frame.pack(fill=tk.X, pady=6)
             btn_add_rect = ttk.Button(btn_frame, text="➕ 50×30 Rect", command=lambda: self._add_rect_to_sketch(feature, 50.0, 30.0))
             btn_add_rect.pack(fill=tk.X, pady=2)
@@ -369,16 +449,16 @@ class MainWindow(tk.Tk):
             return
 
         for param_name, param in feature.parameters.items():
-            row = tk.Frame(self.props_container, bg="#0F172A")
+            row = tk.Frame(self.props_container, bg=th.bg_panel)
             row.pack(fill=tk.X, pady=4)
 
-            tk.Label(row, text=f"{param_name.capitalize()}:", bg="#0F172A", fg="#E2E8F0", width=14, anchor=tk.W).pack(side=tk.LEFT)
+            tk.Label(row, text=f"{param_name.capitalize()}:", bg=th.bg_panel, fg=th.fg_primary, width=14, anchor=tk.W).pack(side=tk.LEFT)
 
-            entry = tk.Entry(row, bg="#1E293B", fg="#F8FAFC", insertbackground="#38BDF8", width=10, relief="flat")
+            entry = tk.Entry(row, bg=th.bg_input, fg=th.fg_primary, insertbackground=th.fg_accent, width=10, relief="flat")
             entry.insert(0, str(param.value))
             entry.pack(side=tk.LEFT, padx=4)
 
-            tk.Label(row, text=param.unit, bg="#0F172A", fg="#94A3B8").pack(side=tk.LEFT)
+            tk.Label(row, text=param.unit, bg=th.bg_panel, fg=th.fg_secondary).pack(side=tk.LEFT)
 
             def make_handler(f_id: str, p_name: str, ent: tk.Entry):
                 return lambda: self._apply_param_edit(f_id, p_name, ent.get())
@@ -422,20 +502,17 @@ class MainWindow(tk.Tk):
         if not prompt:
             return
 
-        # 1. Preview visual ghost in 3D Viewport
         plan = self.agent.plan_prompt(prompt)
         if plan.ghost_mesh:
             self.viewport.set_ghost_mesh(plan.ghost_mesh, delta_vol=plan.predicted_delta_vol)
 
-        # 2. Execute plan
         result = self.agent.execute_prompt(prompt)
         if result.success:
-            self.status_bar.config(text=f"✨ AI: {result.explanation}", fg="#38BDF8")
+            self.status_bar.config(text=f"✨ AI: {result.explanation}", fg=self.theme.fg_accent)
         else:
-            self.status_bar.config(text=f"⚠️ AI Error: {result.error_message}", fg="#EF4444")
+            self.status_bar.config(text=f"⚠️ AI Error: {result.error_message}", fg=self.theme.color_error)
             messagebox.showwarning("CAD Agent Notice", result.error_message)
 
-        # 3. Refresh and clear ghost preview upon commit
         self._refresh_all()
 
     def _action_configure_api_keys(self) -> None:
@@ -443,22 +520,22 @@ class MainWindow(tk.Tk):
         dlg = tk.Toplevel(self)
         dlg.title("Configure AI Cloud Providers")
         dlg.geometry("460x280")
-        dlg.configure(bg="#0F172A")
+        dlg.configure(bg=self.theme.bg_panel)
         dlg.transient(self)
         dlg.grab_set()
 
-        tk.Label(dlg, text="SoftWork AI Cloud Provider Setup", font=("Segoe UI", 11, "bold"), bg="#0F172A", fg="#38BDF8").pack(pady=10)
+        tk.Label(dlg, text="SoftWork AI Cloud Provider Setup", font=("Segoe UI", 11, "bold"), bg=self.theme.bg_panel, fg=self.theme.fg_accent).pack(pady=10)
         
-        frame = tk.Frame(dlg, bg="#0F172A", padx=15)
+        frame = tk.Frame(dlg, bg=self.theme.bg_panel, padx=15)
         frame.pack(fill=tk.BOTH, expand=True)
 
-        tk.Label(frame, text="Active Provider:", bg="#0F172A", fg="#E2E8F0").grid(row=0, column=0, sticky=tk.W, pady=6)
+        tk.Label(frame, text="Active Provider:", bg=self.theme.bg_panel, fg=self.theme.fg_primary).grid(row=0, column=0, sticky=tk.W, pady=6)
         prov_var = tk.StringVar(value="Offline Heuristic Engine")
         combo = ttk.Combobox(frame, textvariable=prov_var, values=["Offline Heuristic Engine", "Google Gemini (1.5 Pro)", "OpenAI (GPT-4o)", "Anthropic (Claude 3.5)"], state="readonly", width=26)
         combo.grid(row=0, column=1, pady=6)
 
-        tk.Label(frame, text="API Key:", bg="#0F172A", fg="#E2E8F0").grid(row=1, column=0, sticky=tk.W, pady=6)
-        key_entry = tk.Entry(frame, bg="#1E293B", fg="#F8FAFC", insertbackground="#38BDF8", width=28, show="*")
+        tk.Label(frame, text="API Key:", bg=self.theme.bg_panel, fg=self.theme.fg_primary).grid(row=1, column=0, sticky=tk.W, pady=6)
+        key_entry = tk.Entry(frame, bg=self.theme.bg_input, fg=self.theme.fg_primary, insertbackground=self.theme.fg_accent, width=28, show="*")
         key_entry.grid(row=1, column=1, pady=6)
 
         def apply_provider():
@@ -494,7 +571,6 @@ class MainWindow(tk.Tk):
 
     def _action_create_sketch(self, plane: str = "XY") -> None:
         CreateSketchCommand(name=f"Sketch_{plane}", plane_type=StandardPlane(plane)).execute(self.document)
-        # Select and populate default profile so it's immediately visible
         sk_feat = self.document.active_part.features[-1]
         if isinstance(sk_feat, SketchFeature):
             sk_feat.sketch.add_rectangle(60.0, 40.0, centered=True)
@@ -504,7 +580,6 @@ class MainWindow(tk.Tk):
 
     def _action_extrude_sketch(self) -> None:
         sk_feat = None
-        # Check selected feature
         sel_id = self.document.selection.primary_feature_id
         if sel_id:
             f = self.document.get_feature(sel_id)
@@ -570,7 +645,7 @@ class MainWindow(tk.Tk):
         self.agent.execute_prompt("Add a 100 x 60 mm rectangle to sketch")
         self.agent.execute_prompt("Extrude the sketch by 25 mm")
         self._refresh_all()
-        messagebox.showinfo("v0.2 Sketch Demo", "Successfully created 2D Sketch and extruded into 3D Solid!")
+        messagebox.showinfo("Sketch Demo", "Successfully created 2D Sketch and extruded into 3D Solid!")
 
     def _action_run_demo_flow(self) -> None:
         self.agent.execute_prompt("Create a 100 x 60 x 10 mm mounting plate")
