@@ -10,6 +10,11 @@ from softwork.core.feature import (
     CylinderFeature,
     MountingPlateFeature,
     FilletFeature,
+    ChamferFeature,
+    SketchFeature,
+    ExtrudeFeature,
+    RevolveFeature,
+    PatternFeature,
 )
 from softwork.core.part import Part
 from softwork.core.dependency import DependencyGraph
@@ -27,6 +32,11 @@ __all__ = [
     "CylinderFeature",
     "MountingPlateFeature",
     "FilletFeature",
+    "ChamferFeature",
+    "SketchFeature",
+    "ExtrudeFeature",
+    "RevolveFeature",
+    "PatternFeature",
     "Part",
     "DependencyGraph",
     "SelectionContext",
