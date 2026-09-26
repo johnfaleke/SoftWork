@@ -23,6 +23,8 @@ class FeatureType(str, Enum):
     REVOLVE = "revolve"
     CUT = "cut"
     HOLE = "hole"
+    HOLE_WIZARD = "hole_wizard"
+    SHELL = "shell"
     HOLE_PATTERN = "hole_pattern"
     PATTERN = "pattern"
     FILLET = "fillet"
@@ -426,6 +428,117 @@ class FilletFeature(Feature):
         base_shape = context_shapes[self.target_feature_id]
         r = self.parameters["radius"].canonical_value
         shape = backend.fillet(base_shape, r)
+        self.generated_shape = shape
+        self.status = FeatureStatus.VALID
+        return shape
+
+
+class HoleWizardFeature(Feature):
+    """
+    Standard ISO metric hole feature supporting Simple, Counterbore, and Countersink holes.
+    """
+    def __init__(
+        self,
+        target_feature_id: str,
+        metric_size: str = "M8",
+        hole_type: str = "simple",
+        depth: float = 20.0,
+        pos_u: float = 0.0,
+        pos_v: float = 0.0,
+        name: str = "Hole001",
+        id: Optional[str] = None,
+        provenance: str = "user",
+    ) -> None:
+        super().__init__(
+            id=id or f"hw_{uuid.uuid4().hex[:8]}",
+            name=name,
+            feature_type=FeatureType.HOLE_WIZARD,
+            dependencies=[target_feature_id],
+            provenance=provenance,
+        )
+        self.target_feature_id = target_feature_id
+        self.metric_size = metric_size.upper()
+        self.hole_type = hole_type.lower()
+
+        # Standard ISO metric hole lookup table
+        std_dims: Dict[str, Tuple[float, float, float]] = {
+            "M3": (3.4, 6.0, 3.0),
+            "M4": (4.5, 8.0, 4.0),
+            "M5": (5.5, 9.5, 5.0),
+            "M6": (6.6, 11.0, 6.0),
+            "M8": (9.0, 15.0, 8.0),
+            "M10": (11.0, 18.0, 10.0),
+            "M12": (13.5, 20.0, 12.0),
+            "M16": (17.5, 26.0, 16.0),
+        }
+        dia, cb_dia, cb_dp = std_dims.get(self.metric_size, (8.0, 14.0, 6.0))
+
+        self.parameters = {
+            "diameter": Parameter(name="diameter", value=dia, unit="mm", description="Hole clearance diameter"),
+            "depth": Parameter(name="depth", value=depth, unit="mm", description="Hole depth"),
+            "cb_diameter": Parameter(name="cb_diameter", value=cb_dia, unit="mm", description="Counterbore diameter"),
+            "cb_depth": Parameter(name="cb_depth", value=cb_dp, unit="mm", description="Counterbore depth"),
+            "pos_u": Parameter(name="pos_u", value=pos_u, unit="mm", description="Position U"),
+            "pos_v": Parameter(name="pos_v", value=pos_v, unit="mm", description="Position V"),
+        }
+
+    def evaluate(self, backend: CADBackend, context_shapes: Dict[str, CADShape]) -> CADShape:
+        if self.target_feature_id not in context_shapes:
+            raise ValueError(f"Target shape '{self.target_feature_id}' for Hole Wizard not found")
+        base_shape = context_shapes[self.target_feature_id]
+
+        dia = self.parameters["diameter"].canonical_value
+        dp = self.parameters["depth"].canonical_value
+        cb_dia = self.parameters["cb_diameter"].canonical_value
+        cb_dp = self.parameters["cb_depth"].canonical_value
+        pu = self.parameters["pos_u"].canonical_value
+        pv = self.parameters["pos_v"].canonical_value
+
+        hole_tool = backend.create_hole_tool(
+            hole_type=self.hole_type,
+            diameter=dia,
+            depth=dp,
+            cb_diameter=cb_dia,
+            cb_depth=cb_dp,
+            pos_u=pu,
+            pos_v=pv,
+        )
+        shape = backend.cut(base_shape, hole_tool)
+        self.generated_shape = shape
+        self.status = FeatureStatus.VALID
+        return shape
+
+
+class ShellFeature(Feature):
+    """
+    Hollows a target solid leaving a specified uniform wall thickness.
+    """
+    def __init__(
+        self,
+        target_feature_id: str,
+        wall_thickness: float = 2.0,
+        name: str = "Shell001",
+        id: Optional[str] = None,
+        provenance: str = "user",
+    ) -> None:
+        super().__init__(
+            id=id or f"shell_{uuid.uuid4().hex[:8]}",
+            name=name,
+            feature_type=FeatureType.SHELL,
+            dependencies=[target_feature_id],
+            provenance=provenance,
+        )
+        self.target_feature_id = target_feature_id
+        self.parameters = {
+            "wall_thickness": Parameter(name="wall_thickness", value=wall_thickness, unit="mm", description="Wall thickness"),
+        }
+
+    def evaluate(self, backend: CADBackend, context_shapes: Dict[str, CADShape]) -> CADShape:
+        if self.target_feature_id not in context_shapes:
+            raise ValueError(f"Target shape '{self.target_feature_id}' for Shell not found")
+        base_shape = context_shapes[self.target_feature_id]
+        wt = self.parameters["wall_thickness"].canonical_value
+        shape = backend.shell_solid(base_shape, wall_thickness=wt)
         self.generated_shape = shape
         self.status = FeatureStatus.VALID
         return shape
