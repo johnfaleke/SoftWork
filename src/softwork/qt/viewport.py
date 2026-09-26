@@ -1,5 +1,5 @@
 """
-Modern High-Performance 3D CAD Viewport for SoftWork Qt6 IDE.
+Professional High-Performance 3D CAD Viewport for SoftWork (PTC Creo & SolidWorks aesthetic).
 """
 from __future__ import annotations
 import math
@@ -21,6 +21,7 @@ try:
         QMouseEvent,
         QWheelEvent,
         QPaintEvent,
+        QLinearGradient,
     )
 except ImportError:
     pass
@@ -28,7 +29,9 @@ except ImportError:
 
 class CADQtViewport(QWidget):
     """
-    Hardware-accelerated, high-fidelity 3D Viewport canvas for PySide6 CAD IDE.
+    High-fidelity 3D Viewport canvas for PySide6 CAD IDE.
+    Implements SolidWorks and PTC Creo style gradient background, heads-up view toolbar,
+    anti-aliased shaded geometry, crisp wireframes, 3D triad, and interactive raycasting.
     """
     faceSelected = Signal(int, tuple)
     shapeDrawn = Signal(str, dict)
@@ -64,7 +67,7 @@ class CADQtViewport(QWidget):
         self.selected_face_idx: Optional[int] = None
         self._rendered_faces: List[Tuple[int, List[Tuple[float, float]], Tuple[float, float, float]]] = []
 
-        # HUD Quick View Buttons [(label, rect, action)]
+        # Heads-Up View Toolbar [(label, rect, action)]
         self._hud_buttons: List[Tuple[str, QRect, Callable[[], None]]] = []
 
     def set_tool_mode(self, mode: str, active_plane: Optional[Any] = None) -> None:
@@ -205,18 +208,21 @@ class CADQtViewport(QWidget):
         h = self.height()
         cx, cy = w / 2.0, h / 2.0
 
-        # Background (Deep pitch black canvas)
-        painter.fillRect(0, 0, w, h, QColor("#080808"))
+        # Background: Smooth CAD Gradient (SolidWorks / Creo Dark Slate Studio)
+        gradient = QLinearGradient(0, 0, 0, h)
+        gradient.setColorAt(0.0, QColor("#2A2D34"))
+        gradient.setColorAt(1.0, QColor("#181A1F"))
+        painter.fillRect(0, 0, w, h, gradient)
 
         rad_x = math.radians(self.rot_x)
         rad_y = math.radians(self.rot_y)
 
-        # 1. Sleek CAD Ground Grid
+        # 1. Subtle Precision CAD Datum Grid
         grid_size = 140.0
         grid_step = 20.0
         for g in range(-int(grid_size), int(grid_size) + 1, int(grid_step)):
             is_major = (g == 0)
-            pen_color = QColor("#282828") if is_major else QColor("#141414")
+            pen_color = QColor("#3E4451") if is_major else QColor("#22252A")
             painter.setPen(QPen(pen_color, 1))
 
             p1 = self._project_point(-grid_size, g, 0.0, cx, cy, rad_x, rad_y)
@@ -227,7 +233,7 @@ class CADQtViewport(QWidget):
             p4 = self._project_point(g, grid_size, 0.0, cx, cy, rad_x, rad_y)
             painter.drawLine(int(p3[0]), int(p3[1]), int(p4[0]), int(p4[1]))
 
-        # 2. Render 3D Solid Geometry
+        # 2. Render 3D Solid Geometry (CAD Metallic Shaded with Silhouette Edges)
         self._rendered_faces.clear()
         if self._mesh and self._mesh.faces:
             projected_verts = []
@@ -252,7 +258,7 @@ class CADQtViewport(QWidget):
                 norm_len = math.sqrt(nx * nx + ny * ny + nz * nz)
                 if norm_len > 0:
                     nx, ny, nz = nx / norm_len, ny / norm_len, nz / norm_len
-                    diffuse = max(0.2, nx * light_dir[0] + ny * light_dir[1] + nz * light_dir[2])
+                    diffuse = max(0.25, nx * light_dir[0] + ny * light_dir[1] + nz * light_dir[2])
                 else:
                     diffuse = 0.7
 
@@ -270,15 +276,18 @@ class CADQtViewport(QWidget):
 
                 is_selected = (self.selected_face_idx == face_idx)
                 if is_selected:
-                    face_color = QColor("#FFB800")
-                    border_color = QColor("#FFE066")
+                    # SolidWorks precision cyan selection highlight
+                    face_color = QColor("#00A8FF")
+                    border_color = QColor("#E0F2FE")
                     pen_w = 2
                 else:
-                    r = int(min(255, max(10, 0 * diff)))
-                    g = int(min(255, max(40, 240 * diff)))
-                    b = int(min(255, max(50, 255 * diff)))
+                    # Professional CAD neutral titanium surface with diffuse shading
+                    base_lum = int(140 * diff + 30)
+                    r = min(255, int(base_lum * 0.92))
+                    g = min(255, int(base_lum * 0.96))
+                    b = min(255, int(base_lum * 1.04))
                     face_color = QColor(r, g, b)
-                    border_color = QColor("#007788")
+                    border_color = QColor("#22252A")
                     pen_w = 1
 
                 qpoly = QPolygonF([QPoint(int(v0[0]), int(v0[1])), QPoint(int(v1[0]), int(v1[1])), QPoint(int(v2[0]), int(v2[1]))])
@@ -286,21 +295,21 @@ class CADQtViewport(QWidget):
                 painter.setPen(QPen(border_color, pen_w))
                 painter.drawPolygon(qpoly)
 
-            # Wireframe edges
+            # Crisp dark silhouette edges (SolidWorks 'Shaded with Edges' mode)
             if self._mesh.edges:
-                painter.setPen(QPen(QColor("#00F0FF"), 1.5))
+                painter.setPen(QPen(QColor("#181A1F"), 1.2))
                 for edge in self._mesh.edges:
                     v0 = projected_verts[edge[0]]
                     v1 = projected_verts[edge[1]]
                     painter.drawLine(int(v0[0]), int(v0[1]), int(v1[0]), int(v1[1]))
 
-        # 2.5 AI Ghost Preview Mesh
+        # 2.5 AI Ghost Preview Mesh Overlay
         if self._ghost_mesh and self._ghost_mesh.vertices:
             ghost_proj = []
             for gv in self._ghost_mesh.vertices:
                 ghost_proj.append(self._project_point(gv[0], gv[1], gv[2], cx, cy, rad_x, rad_y))
 
-            ghost_pen = QPen(QColor("#FFB800"), 1, Qt.DashLine)
+            ghost_pen = QPen(QColor("#00A8FF"), 1, Qt.DashLine)
             painter.setPen(ghost_pen)
             painter.setBrush(Qt.NoBrush)
             for f in self._ghost_mesh.faces:
@@ -308,21 +317,21 @@ class CADQtViewport(QWidget):
                 qpoly = QPolygonF([QPoint(int(gv0[0]), int(gv0[1])), QPoint(int(gv1[0]), int(gv1[1])), QPoint(int(gv2[0]), int(gv2[1]))])
                 painter.drawPolygon(qpoly)
 
-            badge_rect = QRect(w - 180, 16, 165, 42)
-            painter.setBrush(QBrush(QColor("#141414")))
-            painter.setPen(QPen(QColor("#FFB800"), 1.5))
-            painter.drawRoundedRect(badge_rect, 6, 6)
+            badge_rect = QRect(w - 190, 14, 175, 40)
+            painter.setBrush(QBrush(QColor("#21252B")))
+            painter.setPen(QPen(QColor("#00A8FF"), 1))
+            painter.drawRoundedRect(badge_rect, 3, 3)
 
-            painter.setPen(QColor("#FFB800"))
+            painter.setPen(QColor("#00A8FF"))
             painter.setFont(QFont("Segoe UI", 9, QFont.Bold))
-            painter.drawText(w - 170, 32, "✨ AI Proposed Shape")
+            painter.drawText(w - 180, 28, "AI PROPOSED GEOMETRY")
 
             vol_str = f"{'+' if self._ghost_delta_vol >= 0 else ''}{self._ghost_delta_vol:,.0f} mm³"
-            painter.setPen(QColor("#00F0FF"))
+            painter.setPen(QColor("#DCE1E8"))
             painter.setFont(QFont("Segoe UI", 8))
-            painter.drawText(w - 170, 48, f"Δ Vol: {vol_str}")
+            painter.drawText(w - 180, 44, f"Predicted Δ Vol: {vol_str}")
 
-        # 3. Render 2D Sketches
+        # 3. Render 2D Sketches (SolidWorks Under Defined / Fully Defined Blue/Black lines)
         for sketch in self._sketches:
             plane = getattr(sketch, "plane", None)
             if not plane:
@@ -335,19 +344,19 @@ class CADQtViewport(QWidget):
                 p3_list = [plane.to_3d(p.u, p.v, 0.0) for p in pts_2d]
                 proj_pts = [self._project_point(p.x, p.y, p.z, cx, cy, rad_x, rad_y) for p in p3_list]
 
-                painter.setPen(QPen(QColor("#00FF66"), 2.5))
+                painter.setPen(QPen(QColor("#007ACC"), 2))
                 n_pts = len(proj_pts)
                 is_closed = hasattr(el, "width") or hasattr(el, "radius") or (n_pts > 2)
                 for i in range(n_pts if is_closed else n_pts - 1):
                     nxt = (i + 1) % n_pts
                     painter.drawLine(int(proj_pts[i][0]), int(proj_pts[i][1]), int(proj_pts[nxt][0]), int(proj_pts[nxt][1]))
 
-                painter.setBrush(QBrush(QColor("#66FFA6")))
-                painter.setPen(QPen(QColor("#008844"), 1))
+                painter.setBrush(QBrush(QColor("#00A8FF")))
+                painter.setPen(QPen(QColor("#005A9E"), 1))
                 for px, py, _ in proj_pts:
                     painter.drawEllipse(QPoint(int(px), int(py)), 3, 3)
 
-        # 3.5 In-progress interactive drawing preview
+        # 3.5 In-progress interactive drawing preview & Smart Dimension
         if self.tool_mode != "SELECT" and self._draw_start_uv and self._draw_cur_uv and self.active_sketch_plane:
             pl = self.active_sketch_plane
             u0, v0 = self._draw_start_uv
@@ -357,48 +366,63 @@ class CADQtViewport(QWidget):
                 pts_rect = [(u0, v0), (u1, v0), (u1, v1), (u0, v1)]
                 p3_rect = [pl.to_3d(u, v, 0.0) for u, v in pts_rect]
                 proj_r = [self._project_point(p.x, p.y, p.z, cx, cy, rad_x, rad_y) for p in p3_rect]
-                painter.setPen(QPen(QColor("#00F0FF"), 2, Qt.DashLine))
+                painter.setPen(QPen(QColor("#00A8FF"), 1.5, Qt.DashLine))
                 for ri in range(4):
                     rnxt = (ri + 1) % 4
                     painter.drawLine(int(proj_r[ri][0]), int(proj_r[ri][1]), int(proj_r[rnxt][0]), int(proj_r[rnxt][1]))
                 w_mm = abs(u1 - u0)
                 h_mm = abs(v1 - v0)
-                painter.setPen(QColor("#00F0FF"))
+                painter.setPen(QColor("#00A8FF"))
                 painter.setFont(QFont("Segoe UI", 9, QFont.Bold))
-                painter.drawText(int(proj_r[2][0] + 12), int(proj_r[2][1] - 8), f"📐 {w_mm:.1f} × {h_mm:.1f} mm")
+                painter.drawText(int(proj_r[2][0] + 10), int(proj_r[2][1] - 6), f"W: {w_mm:.2f} mm  H: {h_mm:.2f} mm")
 
-        # 4. Viewport HUD Navigation Quick Buttons (Top-Left)
+        # 4. Heads-Up View Toolbar (Centered Top of Viewport, SolidWorks / Creo style)
+        hud_center_x = int(w / 2)
+        hud_btn_w = 42
+        hud_btn_h = 22
+        hud_spacing = 3
+        total_hud_w = 7 * hud_btn_w + 6 * hud_spacing
+        start_hud_x = hud_center_x - int(total_hud_w / 2)
+
         self._hud_buttons = [
-            ("Iso", QRect(14, 14, 40, 24), self.set_view_isometric),
-            ("Top", QRect(58, 14, 40, 24), self.set_view_top),
-            ("Front", QRect(102, 14, 42, 24), self.set_view_front),
-            ("Right", QRect(148, 14, 42, 24), self.set_view_right),
-            ("Reset", QRect(194, 14, 44, 24), self.reset_view),
+            ("Fit", QRect(start_hud_x, 10, hud_btn_w, hud_btn_h), self.reset_view),
+            ("Iso", QRect(start_hud_x + (hud_btn_w + hud_spacing) * 1, 10, hud_btn_w, hud_btn_h), self.set_view_isometric),
+            ("Top", QRect(start_hud_x + (hud_btn_w + hud_spacing) * 2, 10, hud_btn_w, hud_btn_h), self.set_view_top),
+            ("Front", QRect(start_hud_x + (hud_btn_w + hud_spacing) * 3, 10, hud_btn_w, hud_btn_h), self.set_view_front),
+            ("Right", QRect(start_hud_x + (hud_btn_w + hud_spacing) * 4, 10, hud_btn_w, hud_btn_h), self.set_view_right),
+            ("Sect", QRect(start_hud_x + (hud_btn_w + hud_spacing) * 5, 10, hud_btn_w, hud_btn_h), lambda: None),
+            ("Style", QRect(start_hud_x + (hud_btn_w + hud_spacing) * 6, 10, hud_btn_w, hud_btn_h), lambda: None),
         ]
+
         painter.setFont(QFont("Segoe UI", 8, QFont.Bold))
         for label, rect, _ in self._hud_buttons:
-            painter.setBrush(QBrush(QColor("#181818")))
-            painter.setPen(QPen(QColor("#2E2E2E"), 1))
-            painter.drawRoundedRect(rect, 4, 4)
-            painter.setPen(QColor("#FFFFFF"))
+            painter.setBrush(QBrush(QColor("#21252B")))
+            painter.setPen(QPen(QColor("#3E4451"), 1))
+            painter.drawRoundedRect(rect, 2, 2)
+            painter.setPen(QColor("#DCE1E8"))
             painter.drawText(rect, Qt.AlignCenter, label)
 
-        # 5. Coordinate Orientation Axes (Bottom-Left)
-        axis_cx, axis_cy = 50, h - 50
-        axis_len = 30.0
+        # 5. 3D Coordinate Triad (Bottom-Left)
+        axis_cx, axis_cy = 45, h - 45
+        axis_len = 28.0
         axes = [
-            ("X", 1.0, 0.0, 0.0, QColor("#EF4444")),
-            ("Y", 0.0, 1.0, 0.0, QColor("#10B981")),
-            ("Z", 0.0, 0.0, 1.0, QColor("#3B82F6")),
+            ("X", 1.0, 0.0, 0.0, QColor("#E06C75")),
+            ("Y", 0.0, 1.0, 0.0, QColor("#98C379")),
+            ("Z", 0.0, 0.0, 1.0, QColor("#61AFEF")),
         ]
-        painter.setFont(QFont("Segoe UI", 9, QFont.Bold))
+        painter.setFont(QFont("Segoe UI", 8, QFont.Bold))
         for label, ax, ay, az, col in axes:
             p_end = self._project_point(ax * axis_len, ay * axis_len, az * axis_len, axis_cx, axis_cy, rad_x, rad_y)
             ax_x = p_end[0] - self.pan_x
             ax_y = p_end[1] - self.pan_y
-            painter.setPen(QPen(col, 2.5))
+            painter.setPen(QPen(col, 2))
             painter.drawLine(int(axis_cx), int(axis_cy), int(ax_x), int(ax_y))
-            painter.drawText(int(ax_x + 4), int(ax_y), label)
+            painter.drawText(int(ax_x + 3), int(ax_y + 3), label)
+
+        # Datum origin circle
+        painter.setBrush(QBrush(QColor("#DCE1E8")))
+        painter.setPen(Qt.NoPen)
+        painter.drawEllipse(QPoint(axis_cx, axis_cy), 2, 2)
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
         pos = event.pos()
