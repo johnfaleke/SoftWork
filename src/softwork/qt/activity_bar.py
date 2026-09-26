@@ -23,7 +23,7 @@ class QtActivityBar(QWidget):
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
-        self.setFixedWidth(46)
+        self.setFixedWidth(56)
         self.setStyleSheet("""
             QWidget {
                 background-color: #181A1F;
@@ -35,11 +35,11 @@ class QtActivityBar(QWidget):
                 border-radius: 3px;
                 color: #8B949E;
                 font-family: "Segoe UI", "Tahoma", sans-serif;
-                font-size: 10px;
+                font-size: 9px;
                 font-weight: 700;
                 padding: 4px 2px;
-                min-height: 32px;
-                min-width: 36px;
+                min-height: 28px;
+                min-width: 48px;
                 text-transform: uppercase;
             }
             QPushButton:hover {
@@ -69,14 +69,14 @@ class QtActivityBar(QWidget):
         self.btn_group.addButton(self.btn_tree)
         layout.addWidget(self.btn_tree)
 
-        self.btn_tools = QPushButton("Feat")
-        self.btn_tools.setToolTip("Parametric Features & Primitives")
+        self.btn_tools = QPushButton("Features")
+        self.btn_tools.setToolTip("Parametric Features and Primitives")
         self.btn_tools.setCheckable(True)
         self.btn_group.addButton(self.btn_tools)
         layout.addWidget(self.btn_tools)
 
-        self.btn_props = QPushButton("Prop")
-        self.btn_props.setToolTip("PropertyManager & Parameters")
+        self.btn_props = QPushButton("Properties")
+        self.btn_props.setToolTip("PropertyManager and Parameters")
         self.btn_props.setCheckable(True)
         self.btn_group.addButton(self.btn_props)
         layout.addWidget(self.btn_props)
@@ -84,14 +84,15 @@ class QtActivityBar(QWidget):
         layout.addStretch()
 
         # Bottom Actions
-        self.btn_ai = QPushButton("AI")
-        self.btn_ai.setToolTip("Parametric Copilot HUD (NLP Engine)")
+        self.btn_ai = QPushButton("Copilot")
+        self.btn_ai.setToolTip("Parametric Copilot HUD")
         self.btn_ai.setStyleSheet("""
             QPushButton {
                 color: #00A8FF;
                 border: 1px solid #007ACC;
                 background-color: #1E2227;
                 font-weight: bold;
+                font-size: 9px;
             }
             QPushButton:hover {
                 background-color: #007ACC;
@@ -101,8 +102,8 @@ class QtActivityBar(QWidget):
         self.btn_ai.clicked.connect(self.aiClicked.emit)
         layout.addWidget(self.btn_ai)
 
-        self.btn_settings = QPushButton("Cfg")
-        self.btn_settings.setToolTip("Workspace & Units Configuration")
+        self.btn_settings = QPushButton("Settings")
+        self.btn_settings.setToolTip("Workspace and Units Configuration")
         self.btn_settings.clicked.connect(self.settingsClicked.emit)
         layout.addWidget(self.btn_settings)
 
