@@ -49,7 +49,7 @@ class SemanticReference:
             self.normal_hint[1] * normal[1] +
             self.normal_hint[2] * normal[2]
         )
-        if dot < 0.3 and abs(self.normal_hint[2] - normal[2]) > 0.5:
+        if dot < 0.5:
             return 0.0
 
         dist = math.sqrt(
@@ -57,7 +57,7 @@ class SemanticReference:
             (self.centroid_hint[1] - centroid[1]) ** 2 +
             (self.centroid_hint[2] - centroid[2]) ** 2
         )
-        score = max(0.0, 1.0 - (dist / 200.0))
+        score = max(0.0, 1.0 - (dist / 200.0)) * max(0.0, dot)
         return score
 
 
@@ -104,35 +104,42 @@ class SemanticTopologyMatcher:
             cy = (v0[1] + v1[1] + v2[1]) / 3.0
             cz = (v0[2] + v1[2] + v2[2]) / 3.0
 
-            # Determine role
+            # Determine role & correct outward normal hint
             if (norm[2] > 0.4 or abs(cz - max_z) < 1e-3) and cz > (min_z + 0.1):
                 role = SemanticRole.TOP_FACE
                 tag = f"{feature_id}:face:top_{idx}"
+                norm_hint = (0.0, 0.0, 1.0)
             elif (norm[2] < -0.4 or abs(cz - min_z) < 1e-3) and cz < (max_z - 0.1):
                 role = SemanticRole.BOTTOM_FACE
                 tag = f"{feature_id}:face:bottom_{idx}"
+                norm_hint = (0.0, 0.0, -1.0)
             elif norm[1] > 0.5:
                 role = SemanticRole.BACK_FACE
                 tag = f"{feature_id}:face:back_{idx}"
+                norm_hint = (0.0, 1.0, 0.0)
             elif norm[1] < -0.5:
                 role = SemanticRole.FRONT_FACE
                 tag = f"{feature_id}:face:front_{idx}"
+                norm_hint = (0.0, -1.0, 0.0)
             elif norm[0] < -0.5:
                 role = SemanticRole.LEFT_FACE
                 tag = f"{feature_id}:face:left_{idx}"
+                norm_hint = (-1.0, 0.0, 0.0)
             elif norm[0] > 0.5:
                 role = SemanticRole.RIGHT_FACE
                 tag = f"{feature_id}:face:right_{idx}"
+                norm_hint = (1.0, 0.0, 0.0)
             else:
                 role = SemanticRole.GENERIC_FACE
                 tag = f"{feature_id}:face:generic_{idx}"
+                norm_hint = norm
 
             ref = SemanticReference(
                 tag=tag,
                 role=role,
                 parent_feature_id=feature_id,
                 feature_name=feature_name,
-                normal_hint=norm,
+                normal_hint=norm_hint,
                 centroid_hint=(cx, cy, cz),
             )
             refs.append(ref)
