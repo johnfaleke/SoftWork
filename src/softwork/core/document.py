@@ -12,6 +12,7 @@ from softwork.cad.topology import CADShape
 from softwork.cad.validation import GeometryValidator, ValidationReport
 from softwork.core.dependency import DependencyGraph
 from softwork.core.feature import Feature, FeatureStatus
+from softwork.core.material import Material, DEFAULT_MATERIAL
 from softwork.core.parameter import Parameter
 from softwork.core.part import Part
 from softwork.core.selection import SelectionContext
@@ -29,6 +30,7 @@ class Document:
         self.name: str = name
         self.created_at: str = datetime.datetime.now().isoformat()
         self.backend: CADBackend = backend or DirectGeometryBackend()
+        self.material: Material = DEFAULT_MATERIAL
         
         self.parts: List[Part] = []
         self.global_parameters: Dict[str, Parameter] = {}
