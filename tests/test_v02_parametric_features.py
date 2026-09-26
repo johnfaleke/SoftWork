@@ -82,6 +82,32 @@ class TestV02ParametricFeatures(unittest.TestCase):
         self.assertIsNotNone(doc.active_part.active_solid)
         self.assertEqual(doc.active_part.active_solid.volume, 100.0 * 60.0 * 25.0)
 
+    def test_sketch_extrude_on_mounting_plate(self):
+        doc = Document(name="PlateWithExtrudeBoss")
+        agent = CADAgent(doc)
+
+        # 1. Create base mounting plate
+        res1 = agent.execute_prompt("Create a 100 x 60 x 10 mm mounting plate")
+        self.assertTrue(res1.success)
+        base_vol = doc.active_part.active_solid.volume
+        self.assertGreater(base_vol, 0.0)
+
+        # 2. Add sketch on plate
+        res2 = agent.execute_prompt("Create sketch on XY plane")
+        self.assertTrue(res2.success)
+
+        # 3. Add 40x30 mm rectangle boss
+        res3 = agent.execute_prompt("Add a 40 x 30 mm rectangle to sketch")
+        self.assertTrue(res3.success)
+
+        # 4. Extrude boss by 15 mm
+        res4 = agent.execute_prompt("Extrude the sketch by 15 mm")
+        self.assertTrue(res4.success)
+
+        # Volume must be base plate volume + boss extrusion volume (40*30*15 = 18000)
+        expected_boss_vol = 40.0 * 30.0 * 15.0
+        self.assertAlmostEqual(doc.active_part.active_solid.volume, base_vol + expected_boss_vol, delta=1.0)
+
 
 if __name__ == "__main__":
     unittest.main()
