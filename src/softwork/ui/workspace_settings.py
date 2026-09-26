@@ -15,7 +15,7 @@ class WorkspaceSettings:
     """
     User customizable workspace settings and preferences.
     """
-    theme_name: str = "Studio Dark"
+    theme_name: str = "Obsidian Pitch (OLED Black)"
     default_unit: str = "mm"
     
     # Viewport & Grid Settings
