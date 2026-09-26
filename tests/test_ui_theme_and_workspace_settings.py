@@ -6,31 +6,58 @@ import unittest
 import tempfile
 from pathlib import Path
 
-from softwork.ui.theme import ThemePalette, ThemeManager, DARK_THEME, LIGHT_THEME, CYBERPUNK_THEME, TITANIUM_THEME
+from softwork.ui.theme import (
+    ThemePalette,
+    ThemeManager,
+    DARK_THEME,
+    LIGHT_THEME,
+    OBSIDIAN_PITCH,
+    MONOCHROME_CHARCOAL,
+    STUDIO_LIGHT,
+    CYBERPUNK_NEON,
+    INDUSTRIAL_TITANIUM,
+    FOREST_SAGE,
+    SOLARIZED_DARK,
+)
 from softwork.ui.workspace_settings import WorkspaceSettings, WorkspaceSettingsManager
 
 
 class TestUIThemeAndWorkspaceSettings(unittest.TestCase):
     """
-    Validates theme management, dark/light switching, custom palettes, and workspace settings persistence.
+    Validates theme management, 8 theme presets, high-contrast drawing colors, and workspace settings persistence.
     """
 
     def test_theme_palettes_tokens(self) -> None:
-        self.assertTrue(DARK_THEME.is_dark)
-        self.assertFalse(LIGHT_THEME.is_dark)
-        self.assertEqual(DARK_THEME.bg_app, "#0B0F19")
-        self.assertEqual(LIGHT_THEME.bg_app, "#F1F5F9")
-        self.assertEqual(CYBERPUNK_THEME.fg_accent, "#EC4899")
-        self.assertEqual(TITANIUM_THEME.viewport_solid, "#94A3B8")
+        self.assertTrue(OBSIDIAN_PITCH.is_dark)
+        self.assertTrue(MONOCHROME_CHARCOAL.is_dark)
+        self.assertFalse(STUDIO_LIGHT.is_dark)
+        
+        # Verify OLED black & neutral grey tokens
+        self.assertEqual(OBSIDIAN_PITCH.bg_app, "#000000")
+        self.assertEqual(OBSIDIAN_PITCH.bg_panel, "#0C0C0C")
+        self.assertEqual(OBSIDIAN_PITCH.viewport_sketch_line, "#00FF66")
+        self.assertEqual(OBSIDIAN_PITCH.viewport_solid, "#00F0FF")
+
+        self.assertEqual(MONOCHROME_CHARCOAL.bg_app, "#121212")
+        self.assertEqual(MONOCHROME_CHARCOAL.viewport_edge, "#FFFFFF")
+
+        self.assertEqual(CYBERPUNK_NEON.fg_accent, "#EC4899")
+        self.assertEqual(INDUSTRIAL_TITANIUM.viewport_edge, "#FB923C")
 
     def test_custom_theme_registration_and_switching(self) -> None:
         manager = ThemeManager()
+        self.assertEqual(len(manager.themes), 8)
+        self.assertIn("Obsidian Pitch (OLED Black)", manager.themes)
+        self.assertIn("Monochrome Charcoal", manager.themes)
+        self.assertIn("Forest Sage", manager.themes)
+        self.assertIn("Solarized Dark", manager.themes)
+
         custom_palette = ThemePalette(
             name="Emerald Studio",
             is_dark=True,
-            bg_app="#022c22",
-            bg_panel="#064e3b",
-            fg_accent="#10b981",
+            bg_app="#000000",
+            bg_panel="#0A0A0A",
+            fg_accent="#00FF66",
         )
         manager.register_theme(custom_palette)
         self.assertIn("Emerald Studio", manager.themes)
@@ -43,22 +70,23 @@ class TestUIThemeAndWorkspaceSettings(unittest.TestCase):
         self.assertEqual(manager.current_theme.name, "Emerald Studio")
         self.assertEqual(notified_palettes, ["Emerald Studio"])
 
-    def test_theme_dark_light_toggle(self) -> None:
+    def test_theme_switching_across_presets(self) -> None:
         manager = ThemeManager()
-        manager.set_theme("Studio Dark")
-        self.assertTrue(manager.current_theme.is_dark)
+        manager.set_theme("Monochrome Charcoal")
+        self.assertEqual(manager.current_theme.name, "Monochrome Charcoal")
+        self.assertEqual(manager.current_theme.bg_app, "#121212")
 
-        toggled_1 = manager.toggle_dark_light()
-        self.assertEqual(toggled_1, "Studio Light")
+        manager.set_theme("Studio Light")
         self.assertFalse(manager.current_theme.is_dark)
+        self.assertEqual(manager.current_theme.bg_app, "#F4F4F5")
 
-        toggled_2 = manager.toggle_dark_light()
-        self.assertEqual(toggled_2, "Studio Dark")
+        manager.set_theme("Obsidian Pitch (OLED Black)")
         self.assertTrue(manager.current_theme.is_dark)
+        self.assertEqual(manager.current_theme.bg_app, "#000000")
 
     def test_workspace_settings_serialization(self) -> None:
         settings = WorkspaceSettings(
-            theme_name="Cyberpunk Neon",
+            theme_name="Monochrome Charcoal",
             default_unit="in",
             show_grid=True,
             grid_step=50.0,
@@ -66,13 +94,13 @@ class TestUIThemeAndWorkspaceSettings(unittest.TestCase):
             orbit_sensitivity=0.8,
         )
         d = settings.to_dict()
-        self.assertEqual(d["theme_name"], "Cyberpunk Neon")
+        self.assertEqual(d["theme_name"], "Monochrome Charcoal")
         self.assertEqual(d["default_unit"], "in")
         self.assertEqual(d["grid_step"], 50.0)
         self.assertEqual(d["shading_mode"], "wireframe")
 
         restored = WorkspaceSettings.from_dict(d)
-        self.assertEqual(restored.theme_name, "Cyberpunk Neon")
+        self.assertEqual(restored.theme_name, "Monochrome Charcoal")
         self.assertEqual(restored.default_unit, "in")
         self.assertEqual(restored.grid_step, 50.0)
         self.assertEqual(restored.shading_mode, "wireframe")
@@ -82,7 +110,7 @@ class TestUIThemeAndWorkspaceSettings(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             cfg_dir = Path(tmpdir)
             mgr = WorkspaceSettingsManager(config_dir=cfg_dir)
-            self.assertEqual(mgr.settings.theme_name, "Studio Dark")
+            self.assertEqual(mgr.settings.theme_name, "Obsidian Pitch (OLED Black)")
 
             custom_cfg = WorkspaceSettings(
                 theme_name="Industrial Titanium",
