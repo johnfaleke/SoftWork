@@ -11,6 +11,9 @@ from softwork.commands.feature_commands import (
     CreateBoxCommand,
     CreateMountingPlateCommand,
     CreateSketchCommand,
+    AddSketchRectangleCommand,
+    AddSketchCircleCommand,
+    AddSketchLineCommand,
     ExtrudeSketchCommand,
     RevolveSketchCommand,
     AddHoleWizardCommand,
@@ -48,6 +51,7 @@ try:
         QStatusBar,
         QMessageBox,
         QFileDialog,
+        QInputDialog,
         QFrame,
         QScrollArea,
         QTabWidget,
@@ -90,17 +94,6 @@ class CADMainWindow(QMainWindow):
         self._build_command_manager()
         self._build_central_workspace()
         self._build_statusbar()
-
-        # Seed initial geometry proof
-        if not self.document.active_part.features:
-            CreateMountingPlateCommand(
-                length=100.0,
-                width=60.0,
-                thickness=10.0,
-                hole_diameter=8.0,
-                hole_offset=10.0,
-                fillet_radius=2.0,
-            ).execute(self.document)
 
         self._refresh_all()
 
@@ -194,9 +187,10 @@ class CADMainWindow(QMainWindow):
         sketch_tb.addAction("2D Sketch (XZ)", lambda: self._action_create_sketch("XZ"))
         sketch_tb.addAction("2D Sketch (YZ)", lambda: self._action_create_sketch("YZ"))
         sketch_tb.addSeparator()
-        sketch_tb.addAction("Corner Rectangle", lambda: self.viewport.set_tool_mode("DRAW_RECTANGLE", self.viewport.active_sketch_plane))
-        sketch_tb.addAction("Center Circle", lambda: self.viewport.set_tool_mode("DRAW_CIRCLE", self.viewport.active_sketch_plane))
-        sketch_tb.addAction("Select Tool", lambda: self.viewport.set_tool_mode("SELECT"))
+        sketch_tb.addAction("Line Tool", lambda: self._action_set_sketch_tool("DRAW_LINE"))
+        sketch_tb.addAction("Corner Rectangle", lambda: self._action_set_sketch_tool("DRAW_RECTANGLE"))
+        sketch_tb.addAction("Center Circle", lambda: self._action_set_sketch_tool("DRAW_CIRCLE"))
+        sketch_tb.addAction("Select / Pan", lambda: self._action_set_sketch_tool("SELECT"))
         self.ribbon_tabs.addTab(sketch_tb, "Sketch")
 
         # Tab 3: Evaluate
@@ -313,6 +307,7 @@ class CADMainWindow(QMainWindow):
         self.viewport = CADQtViewport(center_widget)
         self.viewport.faceSelected.connect(self._on_face_picked)
         self.viewport.actionTriggered.connect(self._on_viewport_context_action)
+        self.viewport.shapeDrawn.connect(self._on_shape_drawn)
         center_layout.addWidget(self.viewport, 1)
 
         # Draggable Floating Copilot HUD Overlaid on Viewport
@@ -604,78 +599,178 @@ class CADMainWindow(QMainWindow):
     def _on_tree_select(self) -> None:
         pass
 
+    def _get_or_create_active_sketch(self, default_plane: str = "XY") -> SketchFeature:
+        sel_id = self.document.selection.primary_feature_id
+        if sel_id:
+            f = self.document.get_feature(sel_id)
+            if isinstance(f, SketchFeature):
+                return f
+        for f in reversed(self.document.active_part.features):
+            if isinstance(f, SketchFeature):
+                return f
+        CreateSketchCommand(name=f"Sketch_{default_plane}", plane_type=StandardPlane(default_plane)).execute(self.document)
+        return self.document.active_part.features[-1]
+
     def _action_create_sketch(self, plane: str = "XY") -> None:
         CreateSketchCommand(name=f"Sketch_{plane}", plane_type=StandardPlane(plane)).execute(self.document)
         sk_feat = self.document.active_part.features[-1]
-        if isinstance(sk_feat, SketchFeature):
-            sk_feat.sketch.add_rectangle(60.0, 40.0, centered=True)
-            self.document.recompute()
-            self._refresh_all()
+        self.document.selection.select_feature(sk_feat.id)
+        self.viewport.active_sketch_plane = StandardPlane(plane)
+        if plane == "XY":
+            self.viewport.set_view_front()
+        elif plane == "XZ":
+            self.viewport.set_view_top()
+        elif plane == "YZ":
+            self.viewport.set_view_right()
+        self.ribbon_tabs.setCurrentIndex(1)
+        self._refresh_all()
+        self.status_bar.showMessage(f"Created {sk_feat.name} on {plane} Plane. Click 'Line', 'Rectangle', or 'Circle' to draw.", 6000)
+
+    def _action_set_sketch_tool(self, mode: str) -> None:
+        sk_feat = self._get_or_create_active_sketch()
+        plane = getattr(sk_feat.sketch, "plane", StandardPlane("XY"))
+        self.viewport.set_tool_mode(mode, plane)
+        tool_name = mode.replace("DRAW_", "").title() if mode != "SELECT" else "Select / Pan"
+        self.status_bar.showMessage(f"Active Tool: {tool_name} on {sk_feat.name}. Click & drag in viewport to draw.", 5000)
+
+    def _on_shape_drawn(self, shape_type: str, data: dict) -> None:
+        sk_feat = self._get_or_create_active_sketch()
+        if shape_type == "rectangle":
+            w = data.get("width", 50.0)
+            h = data.get("height", 30.0)
+            centered = data.get("centered", True)
+            AddSketchRectangleCommand(sk_feat.id, width=w, height=h, centered=centered).execute(self.document)
+        elif shape_type == "circle":
+            r = data.get("radius", 10.0)
+            AddSketchCircleCommand(sk_feat.id, radius=r).execute(self.document)
+        elif shape_type == "line":
+            AddSketchLineCommand(sk_feat.id, start_u=data["start_u"], start_v=data["start_v"], end_u=data["end_u"], end_v=data["end_v"]).execute(self.document)
+        self._refresh_all()
+        self.status_bar.showMessage(f"Added {shape_type.title()} to {sk_feat.name}. Total Profiles: {len(sk_feat.sketch.profiles)}", 5000)
 
     def _action_extrude(self) -> None:
         sk_feat = None
-        for f in reversed(self.document.active_part.features):
+        sel_id = self.document.selection.primary_feature_id
+        if sel_id:
+            f = self.document.get_feature(sel_id)
             if isinstance(f, SketchFeature):
                 sk_feat = f
-                break
         if not sk_feat:
-            self._action_create_sketch("XY")
-            sk_feat = self.document.active_part.features[-1]
-        if isinstance(sk_feat, SketchFeature):
-            ExtrudeSketchCommand(sketch_feature_id=sk_feat.id, distance=25.0).execute(self.document)
+            for f in reversed(self.document.active_part.features):
+                if isinstance(f, SketchFeature):
+                    sk_feat = f
+                    break
+        if not sk_feat or not sk_feat.sketch.elements:
+            QMessageBox.information(
+                self,
+                "Extrude Boss / Base",
+                "Please create a 2D sketch with closed entities (Rectangle, Circle, Lines) first,\n"
+                "or prompt the AI Copilot to generate geometry."
+            )
+            return
+
+        dist, ok = QInputDialog.getDouble(self, "Extrude Boss / Base", "Extrude Distance (mm):", 25.0, 0.1, 5000.0, 2)
+        if ok:
+            ExtrudeSketchCommand(sketch_feature_id=sk_feat.id, distance=dist).execute(self.document)
             self._refresh_all()
 
     def _action_revolve(self) -> None:
         sk_feat = None
-        for f in reversed(self.document.active_part.features):
+        sel_id = self.document.selection.primary_feature_id
+        if sel_id:
+            f = self.document.get_feature(sel_id)
             if isinstance(f, SketchFeature):
                 sk_feat = f
-                break
         if not sk_feat:
-            self._action_create_sketch("XY")
-            sk_feat = self.document.active_part.features[-1]
-        if isinstance(sk_feat, SketchFeature):
-            RevolveSketchCommand(sketch_feature_id=sk_feat.id, angle_deg=360.0).execute(self.document)
+            for f in reversed(self.document.active_part.features):
+                if isinstance(f, SketchFeature):
+                    sk_feat = f
+                    break
+        if not sk_feat or not sk_feat.sketch.elements:
+            QMessageBox.information(
+                self,
+                "Revolve Boss / Base",
+                "Please create a 2D sketch profile first, or prompt the AI Copilot."
+            )
+            return
+
+        angle, ok = QInputDialog.getDouble(self, "Revolve Boss / Base", "Revolve Angle (deg):", 360.0, 1.0, 360.0, 1)
+        if ok:
+            RevolveSketchCommand(sketch_feature_id=sk_feat.id, angle_deg=angle).execute(self.document)
             self._refresh_all()
 
     def _action_hole_wizard(self) -> None:
         if not self.document.active_part.features:
-            self._action_plate()
+            QMessageBox.information(self, "Hole Wizard", "Create a base solid first before adding standard holes.")
+            return
         target = self.document.active_part.features[0]
-        AddHoleWizardCommand(target_feature_id=target.id, metric_size="M8", hole_type="counterbore", depth=25.0).execute(self.document)
-        self._refresh_all()
+        depth, ok = QInputDialog.getDouble(self, "Hole Wizard", "Hole Depth (mm):", 25.0, 1.0, 500.0, 1)
+        if ok:
+            AddHoleWizardCommand(target_feature_id=target.id, metric_size="M8", hole_type="counterbore", depth=depth).execute(self.document)
+            self._refresh_all()
 
     def _action_fillet(self) -> None:
-        if self.document.active_part.features:
-            feat = self.document.active_part.features[0]
-            AddFilletCommand(target_feature_id=feat.id, radius=2.0).execute(self.document)
+        if not self.document.active_part.features:
+            QMessageBox.information(self, "Fillet", "Create a base solid first before adding fillets.")
+            return
+        target = self.document.active_part.features[0]
+        rad, ok = QInputDialog.getDouble(self, "Fillet", "Fillet Radius (mm):", 2.0, 0.1, 100.0, 2)
+        if ok:
+            AddFilletCommand(target_feature_id=target.id, radius=rad).execute(self.document)
+            self._refresh_all()
+
+    def _action_chamfer(self) -> None:
+        if not self.document.active_part.features:
+            QMessageBox.information(self, "Chamfer", "Create a base solid first before adding chamfers.")
+            return
+        target = self.document.active_part.features[0]
+        dist, ok = QInputDialog.getDouble(self, "Chamfer", "Chamfer Distance (mm):", 1.5, 0.1, 100.0, 2)
+        if ok:
+            AddChamferCommand(target_feature_id=target.id, distance=dist).execute(self.document)
             self._refresh_all()
 
     def _action_shell(self) -> None:
         if not self.document.active_part.features:
-            self._action_box()
+            QMessageBox.information(self, "Shell", "Create a base solid first before adding shell.")
+            return
         target = self.document.active_part.features[0]
-        AddShellCommand(target_feature_id=target.id, wall_thickness=2.0).execute(self.document)
-        self._refresh_all()
+        wall, ok = QInputDialog.getDouble(self, "Shell", "Wall Thickness (mm):", 2.0, 0.1, 50.0, 2)
+        if ok:
+            AddShellCommand(target_feature_id=target.id, wall_thickness=wall).execute(self.document)
+            self._refresh_all()
 
     def _action_pattern(self) -> None:
-        if self.document.active_part.features:
-            feat = self.document.active_part.features[-1]
-            AddPatternCommand(target_feature_id=feat.id, count_x=3, count_y=1, spacing_x=30.0).execute(self.document)
-            self._refresh_all()
-
-    def _action_chamfer(self) -> None:
-        if self.document.active_part.features:
-            feat = self.document.active_part.features[0]
-            AddChamferCommand(target_feature_id=feat.id, distance=1.5).execute(self.document)
-            self._refresh_all()
+        if not self.document.active_part.features:
+            QMessageBox.information(self, "Pattern", "Create a feature to pattern first.")
+            return
+        target = self.document.active_part.features[-1]
+        AddPatternCommand(target_feature_id=target.id, count_x=3, count_y=1, spacing_x=30.0).execute(self.document)
+        self._refresh_all()
 
     def _action_box(self) -> None:
-        CreateBoxCommand(width=100.0, height=60.0, depth=10.0).execute(self.document)
+        w, ok1 = QInputDialog.getDouble(self, "Box Primitive", "Width (mm):", 100.0, 1.0, 5000.0, 1)
+        if not ok1:
+            return
+        h, ok2 = QInputDialog.getDouble(self, "Box Primitive", "Height (mm):", 60.0, 1.0, 5000.0, 1)
+        if not ok2:
+            return
+        d, ok3 = QInputDialog.getDouble(self, "Box Primitive", "Depth (mm):", 10.0, 1.0, 5000.0, 1)
+        if not ok3:
+            return
+        CreateBoxCommand(width=w, height=h, depth=d).execute(self.document)
         self._refresh_all()
 
     def _action_plate(self) -> None:
-        CreateMountingPlateCommand(length=100.0, width=60.0, thickness=10.0, hole_diameter=8.0, hole_offset=10.0, fillet_radius=2.0).execute(self.document)
+        l, ok1 = QInputDialog.getDouble(self, "Mounting Plate Primitive", "Length (mm):", 100.0, 1.0, 5000.0, 1)
+        if not ok1:
+            return
+        w, ok2 = QInputDialog.getDouble(self, "Mounting Plate Primitive", "Width (mm):", 60.0, 1.0, 5000.0, 1)
+        if not ok2:
+            return
+        t, ok3 = QInputDialog.getDouble(self, "Mounting Plate Primitive", "Thickness (mm):", 10.0, 1.0, 5000.0, 1)
+        if not ok3:
+            return
+        CreateMountingPlateCommand(length=l, width=w, thickness=t, hole_diameter=8.0, hole_offset=10.0, fillet_radius=2.0).execute(self.document)
         self._refresh_all()
 
     def _action_undo(self) -> None:

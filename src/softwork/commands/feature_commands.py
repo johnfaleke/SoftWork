@@ -164,6 +164,61 @@ class AddSketchCircleCommand(Command):
         return tx
 
 
+class AddSketchLineCommand(Command):
+    """
+    Adds a 2D line segment to an existing SketchFeature inside an undoable transaction.
+    """
+    def __init__(
+        self,
+        sketch_feature_id: str,
+        start_u: float,
+        start_v: float,
+        end_u: float,
+        end_v: float,
+        provenance: str = "user",
+    ) -> None:
+        self.sketch_feature_id = sketch_feature_id
+        self.start_u = start_u
+        self.start_v = start_v
+        self.end_u = end_u
+        self.end_v = end_v
+        self.provenance = provenance
+
+    def execute(self, document: Document) -> AITransaction:
+        sk_feat = document.get_feature(self.sketch_feature_id)
+        if not isinstance(sk_feat, SketchFeature):
+            raise KeyError(f"Feature '{self.sketch_feature_id}' is not a SketchFeature")
+
+        sketch = sk_feat.sketch
+        prev_elements_count = len(sketch.elements)
+
+        tx = AITransaction(
+            title=f"Add Line ({self.start_u:.1f},{self.start_v:.1f})->({self.end_u:.1f},{self.end_v:.1f}) to {sk_feat.name}",
+            affected_features=[sk_feat.id],
+        )
+
+        def do() -> None:
+            sketch.add_line(self.start_u, self.start_v, self.end_u, self.end_v)
+            document.recompute()
+
+        def undo() -> None:
+            while len(sketch.elements) > prev_elements_count:
+                sketch.elements.pop()
+            document.recompute()
+
+        do()
+        tx.changes.append(
+            TransactionChange(
+                description=f"Added line to {sk_feat.name}",
+                undo_action=undo,
+                redo_action=do,
+            )
+        )
+        tx.is_committed = True
+        document.history.push_transaction(tx)
+        return tx
+
+
 class ExtrudeSketchCommand(Command):
     def __init__(
         self,

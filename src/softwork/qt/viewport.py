@@ -429,6 +429,34 @@ class CADQtViewport(QWidget):
                 painter.setFont(QFont("Segoe UI", 9, QFont.Bold))
                 painter.drawText(int(proj_r[2][0] + 10), int(proj_r[2][1] - 6), f"Width: {w_mm:.2f} mm, Height: {h_mm:.2f} mm")
 
+            elif self.tool_mode == "DRAW_CIRCLE":
+                r_mm = math.hypot(u1 - u0, v1 - v0)
+                num_seg = 36
+                circ_3d = [
+                    pl.to_3d(u0 + r_mm * math.cos(2 * math.pi * si / num_seg), v0 + r_mm * math.sin(2 * math.pi * si / num_seg), 0.0)
+                    for si in range(num_seg)
+                ]
+                proj_c = [self._project_point(p.x, p.y, p.z, cx, cy, rad_x, rad_y) for p in circ_3d]
+                painter.setPen(QPen(QColor("#00A8FF"), 1.5, Qt.DashLine))
+                for si in range(num_seg):
+                    snxt = (si + 1) % num_seg
+                    painter.drawLine(int(proj_c[si][0]), int(proj_c[si][1]), int(proj_c[snxt][0]), int(proj_c[snxt][1]))
+                painter.setPen(QColor("#00A8FF"))
+                painter.setFont(QFont("Segoe UI", 9, QFont.Bold))
+                painter.drawText(int(proj_c[0][0] + 10), int(proj_c[0][1] - 6), f"Radius: {r_mm:.2f} mm (Dia: {2*r_mm:.2f} mm)")
+
+            elif self.tool_mode == "DRAW_LINE":
+                p3_start = pl.to_3d(u0, v0, 0.0)
+                p3_end = pl.to_3d(u1, v1, 0.0)
+                ps = self._project_point(p3_start.x, p3_start.y, p3_start.z, cx, cy, rad_x, rad_y)
+                pe = self._project_point(p3_end.x, p3_end.y, p3_end.z, cx, cy, rad_x, rad_y)
+                painter.setPen(QPen(QColor("#00A8FF"), 1.5, Qt.DashLine))
+                painter.drawLine(int(ps[0]), int(ps[1]), int(pe[0]), int(pe[1]))
+                len_mm = math.hypot(u1 - u0, v1 - v0)
+                painter.setPen(QColor("#00A8FF"))
+                painter.setFont(QFont("Segoe UI", 9, QFont.Bold))
+                painter.drawText(int(pe[0] + 10), int(pe[1] - 6), f"Length: {len_mm:.2f} mm")
+
         # 4. Heads-Up View Toolbar (Centered Top of Viewport, SolidWorks / Creo style)
         hud_center_x = int(w / 2)
         hud_btn_w = 64
@@ -578,6 +606,9 @@ class CADQtViewport(QWidget):
                 r = math.hypot(u1 - u0, v1 - v0)
                 if r > 1.0:
                     self.shapeDrawn.emit("circle", {"radius": r, "center_u": u0, "center_v": v0})
+            elif shape_type == "line":
+                if math.hypot(u1 - u0, v1 - v0) > 1.0:
+                    self.shapeDrawn.emit("line", {"start_u": u0, "start_v": v0, "end_u": u1, "end_v": v1})
 
             self._draw_start_uv = None
             self._draw_cur_uv = None
