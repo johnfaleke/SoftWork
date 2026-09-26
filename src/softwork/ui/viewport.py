@@ -1,5 +1,5 @@
 """
-3D CAD Viewport with interactive Orbit, Pan, Zoom, Lighting, Face/Entity Picking, and Wireframe Shading.
+3D CAD Viewport with interactive Orbit, Pan, Zoom, Lighting, Face/Entity Picking, Shading, and Theme Support.
 """
 from __future__ import annotations
 import math
@@ -7,6 +7,8 @@ import tkinter as tk
 from typing import Optional, List, Tuple, Dict, Any, Callable
 
 from softwork.cad.geometry import MeshData, BoundingBox, Point3D
+from softwork.ui.theme import ThemePalette, ThemeManager, DARK_THEME
+from softwork.ui.workspace_settings import WorkspaceSettings, WorkspaceSettingsManager
 
 
 class CAD3DCanvas(tk.Canvas):
@@ -17,6 +19,9 @@ class CAD3DCanvas(tk.Canvas):
     - Left-click drag: Orbit rotation (Azimuth & Elevation)
     - Right-click drag / Shift+Left drag: Pan (Translation)
     - Mouse wheel / pinch: Zoom
+    - Modern Theme styling (Dark, Light, Cyberpunk, Titanium)
+    - Custom Workspace Settings (Grid spacing, Shading modes, Axes gizmo)
+    - Quick View cube shortcuts (Top, Front, Right, Iso)
     - Shaded 3D polygonal rasterization with directional diffuse lighting
     - Interactive 3D Face / Surface selection picking (raycasting)
     - Edge highlighting and coordinate orientation axes
@@ -27,9 +32,14 @@ class CAD3DCanvas(tk.Canvas):
         master: Any,
         on_face_selected: Optional[Callable[[int, Tuple[float, float, float]], None]] = None,
         on_shape_drawn: Optional[Callable[[str, Dict[str, Any]], None]] = None,
+        theme: Optional[ThemePalette] = None,
+        settings: Optional[WorkspaceSettings] = None,
         **kwargs: Any
     ) -> None:
-        kwargs.setdefault("bg", "#0F172A")  # Deep slate dark background
+        self.theme: ThemePalette = theme or ThemeManager.get_instance().current_theme
+        self.settings: WorkspaceSettings = settings or WorkspaceSettingsManager.get_instance().settings
+        
+        kwargs.setdefault("bg", self.theme.viewport_bg)
         kwargs.setdefault("highlightthickness", 0)
         super().__init__(master, **kwargs)
 
@@ -60,9 +70,11 @@ class CAD3DCanvas(tk.Canvas):
         self._ghost_mesh: Optional[MeshData] = None
         self._ghost_delta_vol: float = 0.0
         self._sketches: List[Any] = []
-        self._solid_color: str = "#38BDF8"  # Precision CAD cyan/blue
         self.selected_face_idx: Optional[int] = None
         self._rendered_faces: List[Tuple[int, List[Tuple[float, float]], Tuple[float, float, float]]] = []
+
+        # Viewport HUD Quick Action Buttons [(x1, y1, x2, y2, callback_name)]
+        self._hud_buttons: List[Tuple[int, int, int, int, Callable[[], None]]] = []
 
         # Bind mouse events
         self.bind("<ButtonPress-1>", self._on_left_down)
@@ -73,6 +85,17 @@ class CAD3DCanvas(tk.Canvas):
         self.bind("<MouseWheel>", self._on_wheel)
         self.bind("<Configure>", lambda e: self.render())
 
+    def apply_theme(self, theme: ThemePalette) -> None:
+        """Applies a new visual theme palette to the canvas and triggers re-render."""
+        self.theme = theme
+        self.configure(bg=theme.viewport_bg)
+        self.render()
+
+    def apply_settings(self, settings: WorkspaceSettings) -> None:
+        """Applies workspace settings to the viewport."""
+        self.settings = settings
+        self.render()
+
     def set_tool_mode(self, mode: str, active_plane: Optional[Any] = None) -> None:
         self.tool_mode = mode
         if active_plane is not None:
@@ -81,9 +104,8 @@ class CAD3DCanvas(tk.Canvas):
         self._draw_cur_uv = None
         self.render()
 
-    def set_mesh(self, mesh: Optional[MeshData], color: str = "#38BDF8") -> None:
+    def set_mesh(self, mesh: Optional[MeshData], color: Optional[str] = None) -> None:
         self._mesh = mesh
-        self._solid_color = color
         self.selected_face_idx = None
         self._ghost_mesh = None
         self._ghost_delta_vol = 0.0
@@ -92,7 +114,6 @@ class CAD3DCanvas(tk.Canvas):
     def set_ghost_mesh(self, ghost_mesh: Optional[MeshData], delta_vol: float = 0.0) -> None:
         self._ghost_mesh = ghost_mesh
         self._ghost_delta_vol = delta_vol
-        self.render()
         self.render()
 
     def set_sketches(self, sketches: List[Any]) -> None:
@@ -110,6 +131,26 @@ class CAD3DCanvas(tk.Canvas):
         self.selected_face_idx = None
         self.render()
 
+    def set_view_top(self) -> None:
+        self.rot_x = 90.0
+        self.rot_y = 0.0
+        self.render()
+
+    def set_view_front(self) -> None:
+        self.rot_x = 0.0
+        self.rot_y = 0.0
+        self.render()
+
+    def set_view_right(self) -> None:
+        self.rot_x = 0.0
+        self.rot_y = -90.0
+        self.render()
+
+    def set_view_isometric(self) -> None:
+        self.rot_x = 35.264
+        self.rot_y = -45.0
+        self.render()
+
     def unproject_to_plane(self, screen_x: float, screen_y: float, plane: Any) -> Tuple[float, float]:
         """Calculates 2D (u, v) on the sketch plane from 2D screen mouse coordinates."""
         w = self.winfo_width() or 800
@@ -122,12 +163,10 @@ class CAD3DCanvas(tk.Canvas):
         y2 = -(screen_y - cy - self.pan_y) / max(0.001, self.zoom)
 
         # Inverse rotation Rx(-rad_x), Ry(-rad_y)
-        # 1. Point at z_screen = 0 in camera space
         cos_x, sin_x = math.cos(-rad_x), math.sin(-rad_x)
         cos_y, sin_y = math.cos(-rad_y), math.sin(-rad_y)
 
-        # Vector in camera space: (x2, y2, 0)
-        # Ray direction in camera space: (0, 0, 1) -> world ray direction
+        # Ray direction in world space:
         rx_d_y = sin_x
         rx_d_z = cos_x
         ray_dx = -sin_y * rx_d_z
@@ -178,6 +217,12 @@ class CAD3DCanvas(tk.Canvas):
         return u, v
 
     def _on_left_down(self, event: tk.Event) -> None:
+        # Check HUD quick view buttons first
+        for x1, y1, x2, y2, callback in self._hud_buttons:
+            if x1 <= event.x <= x2 and y1 <= event.y <= y2:
+                callback()
+                return
+
         self._last_mouse_x = event.x
         self._last_mouse_y = event.y
         self._drag_dist = 0.0
@@ -202,12 +247,13 @@ class CAD3DCanvas(tk.Canvas):
             self.render()
             return
 
+        sensitivity = self.settings.orbit_sensitivity
         if self._is_panning:
             self.pan_x += dx
             self.pan_y += dy
         else:
-            self.rot_y += dx * 0.5
-            self.rot_x = max(-89.0, min(89.0, self.rot_x + dy * 0.5))
+            self.rot_y += dx * sensitivity
+            self.rot_x = max(-89.0, min(89.0, self.rot_x + dy * sensitivity))
 
         self.render()
 
@@ -254,7 +300,8 @@ class CAD3DCanvas(tk.Canvas):
         self.render()
 
     def _on_wheel(self, event: tk.Event) -> None:
-        factor = 1.1 if event.delta > 0 else 0.9
+        zoom_step = self.settings.zoom_sensitivity
+        factor = zoom_step if event.delta > 0 else (1.0 / zoom_step)
         self.zoom = max(0.2, min(50.0, self.zoom * factor))
         self.render()
 
@@ -262,7 +309,6 @@ class CAD3DCanvas(tk.Canvas):
         """Finds closest front-facing 2D polygon containing click coordinate."""
         picked_idx = None
         picked_norm = (0.0, 0.0, 1.0)
-        # Check rendered faces in reverse depth order (front-most first)
         for face_idx, poly_2d, norm in reversed(self._rendered_faces):
             if self._point_in_triangle(mouse_x, mouse_y, poly_2d[0], poly_2d[1], poly_2d[2]):
                 picked_idx = face_idx
@@ -287,13 +333,11 @@ class CAD3DCanvas(tk.Canvas):
         return not (has_neg and has_pos)
 
     def _project_point(self, x: float, y: float, z: float, cx: float, cy: float, rad_x: float, rad_y: float) -> Tuple[float, float, float]:
-        # 1. Rotate Y (Azimuth)
         cos_y, sin_y = math.cos(rad_y), math.sin(rad_y)
         x1 = x * cos_y + z * sin_y
         y1 = y
         z1 = -x * sin_y + z * cos_y
 
-        # 2. Rotate X (Elevation)
         cos_x, sin_x = math.cos(rad_x), math.sin(rad_x)
         x2 = x1
         y2 = y1 * cos_x - z1 * sin_x
@@ -306,6 +350,8 @@ class CAD3DCanvas(tk.Canvas):
     def render(self) -> None:
         self.delete("all")
         self._rendered_faces.clear()
+        self._hud_buttons.clear()
+        
         w = self.winfo_width() or 800
         h = self.winfo_height() or 600
         cx, cy = w / 2.0, h / 2.0
@@ -314,18 +360,22 @@ class CAD3DCanvas(tk.Canvas):
         rad_y = math.radians(self.rot_y)
 
         # 1. Subtle CAD workspace grid
-        grid_size = 120.0
-        grid_step = 20.0
-        for g in range(-int(grid_size), int(grid_size) + 1, int(grid_step)):
-            p1 = self._project_point(-grid_size, g, 0.0, cx, cy, rad_x, rad_y)
-            p2 = self._project_point(grid_size, g, 0.0, cx, cy, rad_x, rad_y)
-            self.create_line(p1[0], p1[1], p2[0], p2[1], fill="#1E293B", width=1)
+        if self.settings.show_grid:
+            grid_size = self.settings.grid_size
+            grid_step = self.settings.grid_step
+            for g in range(-int(grid_size), int(grid_size) + 1, int(grid_step)):
+                is_major = (g == 0 or g % int(grid_step * 2) == 0)
+                grid_col = self.theme.viewport_grid_major if is_major else self.theme.viewport_grid
+                p1 = self._project_point(-grid_size, g, 0.0, cx, cy, rad_x, rad_y)
+                p2 = self._project_point(grid_size, g, 0.0, cx, cy, rad_x, rad_y)
+                self.create_line(p1[0], p1[1], p2[0], p2[1], fill=grid_col, width=1)
 
-            p3 = self._project_point(g, -grid_size, 0.0, cx, cy, rad_x, rad_y)
-            p4 = self._project_point(g, grid_size, 0.0, cx, cy, rad_x, rad_y)
-            self.create_line(p3[0], p3[1], p4[0], p4[1], fill="#1E293B", width=1)
+                p3 = self._project_point(g, -grid_size, 0.0, cx, cy, rad_x, rad_y)
+                p4 = self._project_point(g, grid_size, 0.0, cx, cy, rad_x, rad_y)
+                self.create_line(p3[0], p3[1], p4[0], p4[1], fill=grid_col, width=1)
 
         # 2. Render 3D Solid Geometry
+        shading = self.settings.shading_mode
         if self._mesh and self._mesh.faces:
             projected_verts: List[Tuple[float, float, float]] = []
             for v in self._mesh.vertices:
@@ -357,6 +407,12 @@ class CAD3DCanvas(tk.Canvas):
 
             face_order.sort(key=lambda item: item[0])
 
+            # Hex to RGB for solid
+            base_col_hex = self.theme.viewport_solid.lstrip("#")
+            r_base = int(base_col_hex[0:2], 16) if len(base_col_hex) == 6 else 56
+            g_base = int(base_col_hex[2:4], 16) if len(base_col_hex) == 6 else 189
+            b_base = int(base_col_hex[4:6], 16) if len(base_col_hex) == 6 else 248
+
             for _, face_idx, face, diff, norm in face_order:
                 v0 = projected_verts[face[0]]
                 v1 = projected_verts[face[1]]
@@ -367,34 +423,34 @@ class CAD3DCanvas(tk.Canvas):
 
                 is_selected = (self.selected_face_idx == face_idx)
                 if is_selected:
-                    # Highlight selected surface in bright amber/gold
-                    color_hex = "#F59E0B"
-                    outline_hex = "#FBBF24"
+                    color_hex = self.theme.viewport_selected_face
+                    outline_hex = self.theme.viewport_selected_outline
                     outline_w = 2
                 else:
-                    r_base, g_base, b_base = 56, 189, 248  # #38BDF8
-                    r = int(min(255, max(15, r_base * diff)))
-                    g = int(min(255, max(30, g_base * diff)))
-                    b = int(min(255, max(50, b_base * diff)))
+                    r = int(min(255, max(20, r_base * diff)))
+                    g = int(min(255, max(20, g_base * diff)))
+                    b = int(min(255, max(20, b_base * diff)))
                     color_hex = f"#{r:02x}{g:02x}{b:02x}"
-                    outline_hex = "#0284C7"
-                    outline_w = 1
+                    outline_hex = self.theme.viewport_solid_outline if shading == "shaded_edges" else ""
+                    outline_w = 1 if shading == "shaded_edges" else 0
 
-                self.create_polygon(
-                    v0[0], v0[1], v1[0], v1[1], v2[0], v2[1],
-                    fill=color_hex,
-                    outline=outline_hex,
-                    width=outline_w,
-                )
+                if shading != "wireframe":
+                    self.create_polygon(
+                        v0[0], v0[1], v1[0], v1[1], v2[0], v2[1],
+                        fill=color_hex,
+                        outline=outline_hex,
+                        width=outline_w,
+                    )
 
-            if self._mesh.edges:
+            if shading in ("shaded_edges", "wireframe") and self._mesh.edges:
+                edge_col = self.theme.viewport_edge
                 for edge in self._mesh.edges:
                     v0 = projected_verts[edge[0]]
                     v1 = projected_verts[edge[1]]
-                    self.create_line(v0[0], v0[1], v1[0], v1[1], fill="#38BDF8", width=1.5)
+                    self.create_line(v0[0], v0[1], v1[0], v1[1], fill=edge_col, width=1.5)
 
         # 2.5 Render AI Ghost Preview Overlay
-        if self._ghost_mesh and self._ghost_mesh.vertices:
+        if self.settings.show_ghost_preview and self._ghost_mesh and self._ghost_mesh.vertices:
             ghost_proj: List[Tuple[float, float, float]] = []
             for gv in self._ghost_mesh.vertices:
                 ghost_proj.append(self._project_point(gv[0], gv[1], gv[2], cx, cy, rad_x, rad_y))
@@ -405,18 +461,23 @@ class CAD3DCanvas(tk.Canvas):
                     self.create_polygon(
                         gv0[0], gv0[1], gv1[0], gv1[1], gv2[0], gv2[1],
                         fill="",
-                        outline="#F59E0B",
+                        outline=self.theme.viewport_ghost_mesh,
                         width=1,
                         dash=(4, 2),
                     )
 
             # Floating AI Ghost HUD badge in viewport top-right
-            badge_x = w - 180
-            badge_y = 20
-            self.create_rectangle(badge_x, badge_y, badge_x + 160, badge_y + 36, fill="#1E293B", outline="#F59E0B", width=2)
+            badge_x = w - 190
+            badge_y = 15
+            self.create_rectangle(
+                badge_x, badge_y, badge_x + 175, badge_y + 40,
+                fill=self.theme.viewport_hud_bg,
+                outline=self.theme.viewport_hud_border,
+                width=2
+            )
             vol_str = f"{'+' if self._ghost_delta_vol >= 0 else ''}{self._ghost_delta_vol:,.0f} mm³"
-            self.create_text(badge_x + 80, badge_y + 12, text="✨ AI Proposed Shape", fill="#FBBF24", font=("Segoe UI", 8, "bold"))
-            self.create_text(badge_x + 80, badge_y + 26, text=f"Δ Vol: {vol_str}", fill="#38BDF8", font=("Segoe UI", 8))
+            self.create_text(badge_x + 88, badge_y + 13, text="✨ AI Proposed Preview", fill=self.theme.fg_accent, font=("Segoe UI", 9, "bold"))
+            self.create_text(badge_x + 88, badge_y + 28, text=f"Δ Vol: {vol_str}", fill=self.theme.fg_primary, font=("Segoe UI", 8))
 
         # 3. Render 2D Sketches in 3D Space
         for sketch in self._sketches:
@@ -432,10 +493,10 @@ class CAD3DCanvas(tk.Canvas):
                 bnxt = (bi + 1) % 4
                 self.create_line(
                     proj_box[bi][0], proj_box[bi][1], proj_box[bnxt][0], proj_box[bnxt][1],
-                    fill="#475569", width=1, dash=(3, 3)
+                    fill=self.theme.fg_muted, width=1, dash=(3, 3)
                 )
 
-            # Draw sketch elements (lines, rectangles, circles, polygons)
+            # Draw sketch elements
             for el in getattr(sketch, "elements", []):
                 pts_2d = el.sample_points(32)
                 if not pts_2d:
@@ -443,25 +504,31 @@ class CAD3DCanvas(tk.Canvas):
                 p3_list = [plane.to_3d(p.u, p.v, 0.0) for p in pts_2d]
                 proj_pts = [self._project_point(p.x, p.y, p.z, cx, cy, rad_x, rad_y) for p in p3_list]
 
-                # Draw wire loop
                 n_pts = len(proj_pts)
                 is_closed_el = hasattr(el, "width") or hasattr(el, "radius") or (n_pts > 2)
                 for i in range(n_pts if is_closed_el else n_pts - 1):
                     nxt = (i + 1) % n_pts
                     self.create_line(
                         proj_pts[i][0], proj_pts[i][1], proj_pts[nxt][0], proj_pts[nxt][1],
-                        fill="#10B981", width=2.5
+                        fill=self.theme.viewport_sketch_line, width=2.5
                     )
 
-                # Draw vertex dots
                 for px, py, _ in proj_pts:
-                    self.create_oval(px - 3, py - 3, px + 3, py + 3, fill="#34D399", outline="#065F46", width=1)
+                    self.create_oval(
+                        px - 3, py - 3, px + 3, py + 3,
+                        fill=self.theme.viewport_sketch_point,
+                        outline=self.theme.border, width=1
+                    )
 
-            # Draw sketch tag
             tag_p3 = plane.to_3d(0.0, 0.0, 0.0)
             tag_proj = self._project_point(tag_p3.x, tag_p3.y, tag_p3.z, cx, cy, rad_x, rad_y)
             sk_name = getattr(sketch, "name", "Sketch")
-            self.create_text(tag_proj[0], tag_proj[1] - 12, text=f"✏️ {sk_name}", fill="#10B981", font=("Segoe UI", 9, "bold"))
+            self.create_text(
+                tag_proj[0], tag_proj[1] - 12,
+                text=f"✏️ {sk_name}",
+                fill=self.theme.viewport_sketch_line,
+                font=("Segoe UI", 9, "bold")
+            )
 
         # 3.5 In-progress interactive drawing preview
         if self.tool_mode != "SELECT" and self._draw_start_uv and self._draw_cur_uv and self.active_sketch_plane:
@@ -475,10 +542,10 @@ class CAD3DCanvas(tk.Canvas):
                 proj_r = [self._project_point(p.x, p.y, p.z, cx, cy, rad_x, rad_y) for p in p3_rect]
                 for ri in range(4):
                     rnxt = (ri + 1) % 4
-                    self.create_line(proj_r[ri][0], proj_r[ri][1], proj_r[rnxt][0], proj_r[rnxt][1], fill="#38BDF8", width=2, dash=(4, 2))
+                    self.create_line(proj_r[ri][0], proj_r[ri][1], proj_r[rnxt][0], proj_r[rnxt][1], fill=self.theme.fg_accent, width=2, dash=(4, 2))
                 w_mm = abs(u1 - u0)
                 h_mm = abs(v1 - v0)
-                self.create_text(proj_r[2][0] + 15, proj_r[2][1] - 10, text=f"📐 {w_mm:.1f} × {h_mm:.1f} mm", fill="#38BDF8", font=("Segoe UI", 10, "bold"))
+                self.create_text(proj_r[2][0] + 15, proj_r[2][1] - 10, text=f"📐 {w_mm:.1f} × {h_mm:.1f} mm", fill=self.theme.fg_accent, font=("Segoe UI", 10, "bold"))
 
             elif self.tool_mode == "DRAW_CIRCLE":
                 r_mm = math.hypot(u1 - u0, v1 - v0)
@@ -491,30 +558,56 @@ class CAD3DCanvas(tk.Canvas):
                 proj_c = [self._project_point(p.x, p.y, p.z, cx, cy, rad_x, rad_y) for p in circ_pts]
                 for ci in range(32):
                     cnxt = (ci + 1) % 32
-                    self.create_line(proj_c[ci][0], proj_c[ci][1], proj_c[cnxt][0], proj_c[cnxt][1], fill="#38BDF8", width=2, dash=(4, 2))
+                    self.create_line(proj_c[ci][0], proj_c[ci][1], proj_c[cnxt][0], proj_c[cnxt][1], fill=self.theme.fg_accent, width=2, dash=(4, 2))
                 cp0 = self._project_point(pl.to_3d(u0, v0, 0.0).x, pl.to_3d(u0, v0, 0.0).y, pl.to_3d(u0, v0, 0.0).z, cx, cy, rad_x, rad_y)
                 cp1 = self._project_point(pl.to_3d(u1, v1, 0.0).x, pl.to_3d(u1, v1, 0.0).y, pl.to_3d(u1, v1, 0.0).z, cx, cy, rad_x, rad_y)
-                self.create_line(cp0[0], cp0[1], cp1[0], cp1[1], fill="#F59E0B", width=1.5)
-                self.create_text(cp1[0] + 12, cp1[1] - 8, text=f"⭕ R = {r_mm:.1f} mm", fill="#38BDF8", font=("Segoe UI", 10, "bold"))
+                self.create_line(cp0[0], cp0[1], cp1[0], cp1[1], fill=self.theme.viewport_ghost_mesh, width=1.5)
+                self.create_text(cp1[0] + 12, cp1[1] - 8, text=f"⭕ R = {r_mm:.1f} mm", fill=self.theme.fg_accent, font=("Segoe UI", 10, "bold"))
 
             elif self.tool_mode == "DRAW_LINE":
                 lp0 = self._project_point(pl.to_3d(u0, v0, 0.0).x, pl.to_3d(u0, v0, 0.0).y, pl.to_3d(u0, v0, 0.0).z, cx, cy, rad_x, rad_y)
                 lp1 = self._project_point(pl.to_3d(u1, v1, 0.0).x, pl.to_3d(u1, v1, 0.0).y, pl.to_3d(u1, v1, 0.0).z, cx, cy, rad_x, rad_y)
-                self.create_line(lp0[0], lp0[1], lp1[0], lp1[1], fill="#38BDF8", width=2.5)
+                self.create_line(lp0[0], lp0[1], lp1[0], lp1[1], fill=self.theme.fg_accent, width=2.5)
                 len_mm = math.hypot(u1 - u0, v1 - v0)
-                self.create_text(lp1[0] + 12, lp1[1] - 8, text=f"📏 L = {len_mm:.1f} mm", fill="#38BDF8", font=("Segoe UI", 10, "bold"))
+                self.create_text(lp1[0] + 12, lp1[1] - 8, text=f"📏 L = {len_mm:.1f} mm", fill=self.theme.fg_accent, font=("Segoe UI", 10, "bold"))
 
-        # 4. Coordinate Axes
-        axis_cx, axis_cy = 60, h - 60
-        axis_len = 35.0
-        axes = [
-            ("X", 1.0, 0.0, 0.0, "#EF4444"),
-            ("Y", 0.0, 1.0, 0.0, "#10B981"),
-            ("Z", 0.0, 0.0, 1.0, "#3B82F6"),
+        # 4. Viewport HUD Navigation Cube / Quick View Buttons (Top-Left)
+        view_btns = [
+            ("Iso", self.set_view_isometric),
+            ("Top", self.set_view_top),
+            ("Front", self.set_view_front),
+            ("Right", self.set_view_right),
+            ("Reset", self.reset_view),
         ]
-        for label, ax, ay, az, col in axes:
-            p_end = self._project_point(ax * axis_len, ay * axis_len, az * axis_len, axis_cx, axis_cy, rad_x, rad_y)
-            ax_x = p_end[0] - self.pan_x
-            ax_y = p_end[1] - self.pan_y
-            self.create_line(axis_cx, axis_cy, ax_x, ax_y, fill=col, width=2.5, arrow=tk.LAST)
-            self.create_text(ax_x + 5, ax_y, text=label, fill=col, font=("Segoe UI", 9, "bold"))
+        btn_start_x = 12
+        btn_y = 12
+        btn_w = 42
+        btn_h = 24
+        for idx, (label, action) in enumerate(view_btns):
+            bx1 = btn_start_x + idx * (btn_w + 4)
+            by1 = btn_y
+            bx2 = bx1 + btn_w
+            by2 = by1 + btn_h
+            self.create_rectangle(bx1, by1, bx2, by2, fill=self.theme.bg_card, outline=self.theme.border, width=1)
+            self.create_text((bx1 + bx2) / 2, (by1 + by2) / 2, text=label, fill=self.theme.fg_primary, font=("Segoe UI", 8, "bold"))
+            self._hud_buttons.append((bx1, by1, bx2, by2, action))
+
+        # 5. Coordinate Orientation Axes
+        if self.settings.show_axes and self.settings.axes_position != "none":
+            if self.settings.axes_position == "top_right":
+                axis_cx, axis_cy = w - 60, 80
+            else:
+                axis_cx, axis_cy = 60, h - 60
+
+            axis_len = 35.0
+            axes = [
+                ("X", 1.0, 0.0, 0.0, "#EF4444"),
+                ("Y", 0.0, 1.0, 0.0, "#10B981"),
+                ("Z", 0.0, 0.0, 1.0, "#3B82F6"),
+            ]
+            for label, ax, ay, az, col in axes:
+                p_end = self._project_point(ax * axis_len, ay * axis_len, az * axis_len, axis_cx, axis_cy, rad_x, rad_y)
+                ax_x = p_end[0] - self.pan_x
+                ax_y = p_end[1] - self.pan_y
+                self.create_line(axis_cx, axis_cy, ax_x, ax_y, fill=col, width=2.5, arrow=tk.LAST)
+                self.create_text(ax_x + 5, ax_y, text=label, fill=col, font=("Segoe UI", 9, "bold"))
