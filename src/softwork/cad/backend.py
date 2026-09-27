@@ -98,6 +98,28 @@ class CADBackend(ABC):
         pass
 
     @abstractmethod
+    def create_hole_tool(
+        self,
+        hole_type: str = "simple",
+        diameter: float = 8.0,
+        depth: float = 20.0,
+        cb_diameter: float = 14.0,
+        cb_depth: float = 6.0,
+        cs_angle: float = 90.0,
+        pos_u: float = 0.0,
+        pos_v: float = 0.0,
+        plane: Optional[Any] = None,
+        segments: int = 32,
+    ) -> CADShape:
+        """Create a 3D tool cylinder or counterbore tool for cutting standard holes."""
+        pass
+
+    @abstractmethod
+    def shell_solid(self, shape: CADShape, wall_thickness: float = 2.0) -> CADShape:
+        """Create a hollowed/shelled cavity inside a solid with a given wall thickness."""
+        pass
+
+    @abstractmethod
     def to_mesh(self, shape: CADShape, tolerance: float = 0.1) -> MeshData:
         """Tessellate CAD shape to renderable MeshData."""
         pass

@@ -2,6 +2,7 @@
 CadQuery / OpenCASCADE backend implementation for SoftWork.
 """
 from __future__ import annotations
+import math
 import uuid
 from typing import Optional, Dict, Any
 
@@ -155,12 +156,13 @@ class CadQueryBackend(CADBackend):
         if shape.native_handle is None:
             raise CADKernelError("Cannot pattern shape without native CadQuery handle")
         try:
-            # Pattern across grid
-            pts = []
+            wp = shape.native_handle
             for ix in range(count_x):
                 for iy in range(count_y):
-                    pts.append((ix * spacing_x, iy * spacing_y))
-            wp = cq.Workplane("XY").pushPoints(pts).eachpoint(lambda loc: shape.native_handle.val().located(loc))
+                    if ix == 0 and iy == 0:
+                        continue
+                    shifted = shape.native_handle.translate((ix * spacing_x, iy * spacing_y, 0.0))
+                    wp = wp.union(shifted)
             mesh = self._cq_to_mesh(wp)
             return CADShape(
                 id=f"cq_pattern_{uuid.uuid4().hex[:8]}",
@@ -273,7 +275,10 @@ class CadQueryBackend(CADBackend):
         if radius <= 0:
             raise CADKernelError(f"Fillet radius must be positive, got {radius}")
         try:
-            res = shape.native_handle.edges().fillet(radius)
+            try:
+                res = shape.native_handle.edges("|Z").fillet(radius)
+            except Exception:
+                res = shape.native_handle.edges().fillet(radius)
             mesh = self._cq_to_mesh(res)
             return CADShape(
                 id=f"cq_fillet_{uuid.uuid4().hex[:8]}",
@@ -293,7 +298,10 @@ class CadQueryBackend(CADBackend):
         if distance <= 0:
             raise CADKernelError(f"Chamfer distance must be positive, got {distance}")
         try:
-            res = shape.native_handle.edges().chamfer(distance)
+            try:
+                res = shape.native_handle.edges("|Z").chamfer(distance)
+            except Exception:
+                res = shape.native_handle.edges().chamfer(distance)
             mesh = self._cq_to_mesh(res)
             return CADShape(
                 id=f"cq_chamfer_{uuid.uuid4().hex[:8]}",
@@ -305,6 +313,62 @@ class CadQueryBackend(CADBackend):
             )
         except Exception as e:
             raise CADKernelError(f"CadQuery chamfer failed: {str(e)}") from e
+
+    def create_hole_tool(
+        self,
+        hole_type: str = "simple",
+        diameter: float = 8.0,
+        depth: float = 20.0,
+        cb_diameter: float = 14.0,
+        cb_depth: float = 6.0,
+        cs_angle: float = 90.0,
+        pos_u: float = 0.0,
+        pos_v: float = 0.0,
+        plane: Optional[Any] = None,
+        segments: int = 32,
+    ) -> CADShape:
+        cq = self._ensure_cadquery()
+        try:
+            r_main = diameter / 2.0
+            wp = cq.Workplane("XY").center(pos_u, pos_v).workplane(offset=-depth).circle(r_main).extrude(2.0 * depth)
+            vol = math.pi * (r_main ** 2) * depth
+            if hole_type.lower() == "counterbore" and cb_diameter > diameter and cb_depth > 0:
+                cb_r = cb_diameter / 2.0
+                cb_wp = cq.Workplane("XY").center(pos_u, pos_v).workplane(offset=0.0).circle(cb_r).extrude(depth)
+                wp = wp.union(cb_wp)
+                vol += math.pi * (cb_r ** 2 - r_main ** 2) * cb_depth
+            mesh = self._cq_to_mesh(wp)
+            return CADShape(
+                id=f"cq_hole_tool_{uuid.uuid4().hex[:8]}",
+                shape_type="cylinder",
+                native_handle=wp,
+                volume=vol,
+                is_valid=True,
+                metadata={"mesh": mesh},
+            )
+        except Exception as e:
+            raise CADKernelError(f"CadQuery create_hole_tool failed: {str(e)}") from e
+
+    def shell_solid(self, shape: CADShape, wall_thickness: float = 2.0) -> CADShape:
+        cq = self._ensure_cadquery()
+        if shape.native_handle is None:
+            raise CADKernelError("Cannot shell shape without native CadQuery handle")
+        if wall_thickness <= 0:
+            raise CADKernelError("Wall thickness must be positive")
+        try:
+            res = shape.native_handle.faces(">Z").shell(-wall_thickness)
+            mesh = self._cq_to_mesh(res)
+            vol = max(0.1, shape.volume * 0.4)
+            return CADShape(
+                id=f"cq_shell_{uuid.uuid4().hex[:8]}",
+                shape_type="shell",
+                native_handle=res,
+                volume=vol,
+                is_valid=True,
+                metadata={"mesh": mesh, "wall_thickness": wall_thickness},
+            )
+        except Exception as e:
+            raise CADKernelError(f"CadQuery shell failed: {str(e)}") from e
 
     def to_mesh(self, shape: CADShape, tolerance: float = 0.1) -> MeshData:
         mesh = shape.metadata.get("mesh")
